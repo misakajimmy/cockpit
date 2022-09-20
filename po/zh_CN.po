@@ -508,7 +508,7 @@ msgstr "第9"
 
 #: pkg/shell/hosts_dialog.jsx:85
 msgid "A compatible version of Cockpit is not installed on $0."
-msgstr "$0 上未安装一个兼容版本的 Cockpit。"
+msgstr "$0 上未安装一个兼容版本的 iEOS。"
 
 #: pkg/storaged/stratis-details.jsx:351
 msgid "A filesystem with this name exists already in this pool."
@@ -807,7 +807,7 @@ msgstr "地址"
 
 #: src/bridge/org.cockpit-project.cockpit-bridge.policy.in:10
 msgid "Administration with Cockpit Web Console"
-msgstr "使用 Cockpit Web 控制台管理"
+msgstr "使用 iEOS Web 控制台管理"
 
 #: pkg/shell/superuser.jsx:180 pkg/shell/superuser.jsx:318
 msgid "Administrative access"
@@ -1002,7 +1002,7 @@ msgstr "验证失败： 服务关闭连接"
 msgid ""
 "Authentication is required to perform privileged tasks with the Cockpit Web "
 "Console"
-msgstr "通过Cockpit Web Console进行验证后才能执行特权操作"
+msgstr "通过iEOS Web Console进行验证后才能执行特权操作"
 
 #: pkg/storaged/iscsi-panel.jsx:156
 msgid "Authentication required"
@@ -1460,19 +1460,19 @@ msgstr "关闭已选的页面"
 
 #: src/ws/cockpit.appdata.xml.in:7
 msgid "Cockpit"
-msgstr "Cockpit"
+msgstr "iEOS"
 
 #: pkg/static/login.js:405
 msgid "Cockpit authentication is configured incorrectly."
-msgstr "Cockpit 验证的配置不正确。"
+msgstr "iEOS 验证的配置不正确。"
 
 #: pkg/lib/cockpit.js:3978
 msgid "Cockpit could not contact the given host."
-msgstr "Cockpit 无法联系指定的主机。"
+msgstr "iEOS 无法联系指定的主机。"
 
 #: pkg/shell/shell-modals.jsx:170
 msgid "Cockpit had an unexpected internal error."
-msgstr "Cockpit 出现意外的内部错误。"
+msgstr "iEOS 出现意外的内部错误。"
 
 #: src/ws/cockpit.appdata.xml.in:10
 msgid ""
@@ -1488,19 +1488,19 @@ msgstr ""
 
 #: pkg/shell/shell-modals.jsx:70
 msgid "Cockpit is an interactive Linux server admin interface."
-msgstr "Cockpit 是一个交互式 Linux 服务器管理接口。"
+msgstr "iEOS 是一个交互式 Linux 服务器管理接口。"
 
 #: pkg/lib/cockpit.js:3976
 msgid "Cockpit is not compatible with the software on the system."
-msgstr "Cockpit 与系统上的软件不兼容。"
+msgstr "iEOS 与系统上的软件不兼容。"
 
 #: pkg/shell/hosts_dialog.jsx:77
 msgid "Cockpit is not installed"
-msgstr "Cockpit 未安装"
+msgstr "iEOS 未安装"
 
 #: pkg/lib/cockpit.js:3970
 msgid "Cockpit is not installed on the system."
-msgstr "Cockpit 未安装在系统上。"
+msgstr "iEOS 未安装在系统上。"
 
 #: src/ws/cockpit.appdata.xml.in:18
 msgid ""
@@ -6682,7 +6682,7 @@ msgstr "用户名仅能包含 a-z、数字、点、破折号和下划线的字�
 #: pkg/static/login.js:185
 msgid ""
 "The web browser configuration prevents Cockpit from running (inaccessible $0)"
-msgstr "浏览器配置阻止 Cockpit 运行 （无法访问 $0）"
+msgstr "浏览器配置阻止 iEOS 运行 （无法访问 $0）"
 
 #: pkg/shell/active-pages-modal.jsx:103
 msgid "There are currently no active pages"
@@ -8571,10 +8571,10 @@ msgstr "区"
 #~ msgstr "服务器缺少 cockpit-系统软件包"
 
 #~ msgid "This package is not compatible with this version of Cockpit"
-#~ msgstr "该软件包与该版本的 Cockpit 不兼容"
+#~ msgstr "该软件包与该版本的 iEOS 不兼容"
 
 #~ msgid "This package requires Cockpit version %s or later"
-#~ msgstr "该软件包需要 %s 版本或以后的 Cockpit"
+#~ msgstr "该软件包需要 %s 版本或以后的 iEOS"
 
 #~ msgid "Performance Metrics"
 #~ msgstr "性能指标数据"
@@ -10505,7 +10505,7 @@ msgstr "区"
 #~ msgstr "修改资源限制"
 
 #~ msgid "Cockpit was unable to log into {{#strong}}{{host}}{{/strong}}."
-#~ msgstr "Cockpit 无法登录到 {{#strong}}{{host}}{{/strong}}."
+#~ msgstr "iEOS 无法登录到 {{#strong}}{{host}}{{/strong}}."
 
 #~ msgid ""
 #~ "Cockpit was unable to log into {{#strong}}{{host}}{{/strong}}. You can "
@@ -10973,7 +10973,7 @@ msgstr "区"
 #~ msgstr "连接"
 
 #~ msgid "About Cockpit"
-#~ msgstr "关于 Cockpit"
+#~ msgstr "关于 iEOS"
 
 #~ msgid " (shared with the OS)"
 #~ msgstr " (与操作系统共享)"
