@@ -128,7 +128,6 @@ export class TopNav extends React.Component {
             </DropdownItem>);
         });
 
-        docItems.push(<DropdownSeparator key="separator1" />);
         docItems.push(<DropdownItem key="about" component="button"
                                     onClick={() => Dialogs.show(<AboutCockpitModal />)}>
             {_("About Web Console")}
