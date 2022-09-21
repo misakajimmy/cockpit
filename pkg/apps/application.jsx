@@ -60,23 +60,23 @@ export const Application = ({ metainfo_db, id, progress, progress_title, action 
 
     const comp = metainfo_db.components[id];
 
-    function render_homepage_link(urls) {
-        return urls.map((url, index) => {
-            if (url.type == 'homepage') {
-                return (
-                    <Button isInline variant="link" component='a' href={url.link}
-                            key={"project-url-" + index}
-                            target="_blank" rel="noopener noreferrer"
-                            icon={<ExternalLinkAltIcon />}
-                            iconPosition="right">
-                        {_("View project website")}
-                    </Button>
-                );
-            } else {
-                return null;
-            }
-        });
-    }
+    // function render_homepage_link(urls) {
+    //     return urls.map((url, index) => {
+    //         if (url.type == 'homepage') {
+    //             return (
+    //                 <Button isInline variant="link" component='a' href={url.link}
+    //                         key={"project-url-" + index}
+    //                         target="_blank" rel="noopener noreferrer"
+    //                         icon={<ExternalLinkAltIcon />}
+    //                         iconPosition="right">
+    //                     {_("View project website")}
+    //                 </Button>
+    //             );
+    //         } else {
+    //             return null;
+    //         }
+    //     });
+    // }
 
     // Render a description in the form returned by the AppsSream
     // parser, which is a list of paragraphs and lists.
