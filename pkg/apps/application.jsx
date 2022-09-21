@@ -26,7 +26,7 @@ import {
     Page, PageSection,
     Stack,
 } from "@patternfly/react-core";
-import { ExternalLinkAltIcon } from '@patternfly/react-icons';
+// import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 
 import * as PackageKit from "./packagekit.js";
 
