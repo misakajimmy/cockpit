@@ -1488,7 +1488,7 @@ msgstr ""
 
 #: pkg/shell/shell-modals.jsx:70
 msgid "Cockpit is an interactive Linux server admin interface."
-msgstr "iEOS 是一个交互式 Linux 服务器管理接口。"
+msgstr "iEOS 是一个工业互联网边缘网关，能够通过行业标准工业物联网协议（MQTT、HTTP、OPC-UA等）实现工业PLC接入，并对接入PLC进行采数点管理（接收、计算和可视化，可配置存储和转发）和反控（指令下发）。同时提供现场、远程双调试能力。部署上支持云、本地和端云混合三种部署模式。系统和节点可以统一监控和管理，数据可以统筹定义管理。"
 
 #: pkg/lib/cockpit.js:3976
 msgid "Cockpit is not compatible with the software on the system."
@@ -7589,7 +7589,7 @@ msgstr "Warning 及更高级别"
 
 #: pkg/shell/topnav.jsx:123 pkg/shell/shell-modals.jsx:65
 msgid "Web Console"
-msgstr "Web 控制台"
+msgstr "ThingsWise iEOS Buddy"
 
 #: src/ws/cockpit.appdata.xml.in:8
 msgid "Web Console for Linux servers"
