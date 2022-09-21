@@ -68,7 +68,7 @@ export const AboutCockpitModal = () => {
             backgroundImageSrc="../shell/images/bg-plain.jpg"
         >
             <div>{_("Cockpit is an interactive Linux server admin interface.")}</div>
-            <div><a rel="noopener noreferrer" target="_blank" href="https://cockpit-project.org/">{_("Project website")}</a></div>
+            {/* <div><a rel="noopener noreferrer" target="_blank" href="https://cockpit-project.org/">{_("Project website")}</a></div> */}
             <TextContent>
                 <TextList component="dl">
                     {packages === null && <span>{_("Loading packages...")}</span>}
