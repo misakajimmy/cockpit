@@ -20,10 +20,10 @@ override_dh_auto_configure:
 		--libexecdir=/usr/lib/cockpit $(CONFIG_OPTIONS)
 
 override_dh_systemd_enable:
-	dh_systemd_enable -p cockpit-ws --name=buddy cockpit.socket
+	dh_systemd_enable -p buddy-ws --name=buddy cockpit.socket
 
 override_dh_systemd_start:
-	dh_systemd_start -p cockpit-ws cockpit.socket
+	dh_systemd_start -p buddy-ws cockpit.socket
 
 override_dh_install:
 	# Debian/Ubuntu PAM config
