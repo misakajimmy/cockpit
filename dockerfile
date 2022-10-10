@@ -8,7 +8,10 @@ RUN apt update && \
     curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
     apt install -y nodejs && \
     apt install -y dpkg-dev debhelper libglib2.0-dev libpolkit-agent-1-dev libjson-glib-dev libxslt1-dev libpcp3-dev libpcp-import1-dev libpcp-pmda3-dev xmlto docbook-xsl && \
-    apt install zip && \
+    apt install zip
+
+RUN apt update && \
+    apt upgrade -y && \
     apt install -y python3.9 && \
     rm /usr/bin/python3 && \
     ln -s /usr/bin/python3.9 /usr/bin/python3
