@@ -16,3 +16,6 @@ RUN apt update && \
     rm /usr/bin/python3 && \
     ln -s /usr/bin/python3.9 /usr/bin/python3
 
+COPY tools/build.sh /tmp
+
+RUN ['/tmp/build.sh']

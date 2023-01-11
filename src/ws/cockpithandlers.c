@@ -736,6 +736,34 @@ cockpit_handler_ping (CockpitWebServer *server,
 }
 
 gboolean
+cockpit_handler_auth(CockpitWebServer *server,
+                      CockpitWebRequest *request,
+                      const gchar *path,
+                      GHashTable *headers,
+                      CockpitWebResponse *response,
+                      CockpitHandlerData *ws)
+{
+  GHashTable *out_headers;
+  const gchar *body;
+  GBytes *content;
+
+  out_headers = cockpit_web_server_new_table ();
+
+  g_hash_table_insert (out_headers, g_strdup ("Access-Control-Allow-Origin"), g_strdup ("*"));
+
+  g_hash_table_insert (out_headers, g_strdup ("Content-Type"), g_strdup ("application/json"));
+  body ="{ \"service\": \"cockpit\" }";
+  content = g_bytes_new_static (body, strlen (body));
+
+  cockpit_web_response_content (response, out_headers, content, NULL);
+
+  g_bytes_unref (content);
+  g_hash_table_unref (out_headers);
+
+  return TRUE;
+}
+
+gboolean
 cockpit_handler_ca_cert (CockpitWebServer *server,
                          CockpitWebRequest *request,
                          const gchar *path,
