@@ -64,12 +64,12 @@ gboolean       cockpit_handler_ping              (CockpitWebServer *server,
                                                   CockpitWebResponse *response,
                                                   CockpitHandlerData *ws);
 
-gboolean       cockpit_handler_auth              (CockpitWebServer *server,
+gboolean       cockpit_handler_cookie              (CockpitWebServer *server,
                                                   CockpitWebRequest *request,
                                                   const gchar *path,
                                                   GHashTable *headers,
                                                   CockpitWebResponse *response,
-                                                  CockpitHandlerData *ws);
+                                                  CockpitHandlerData *data);
 
 gboolean       cockpit_handler_ca_cert           (CockpitWebServer *server,
                                                   CockpitWebRequest *request,

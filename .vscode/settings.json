@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "cockpitjson.h": "c",
+        "string_view": "c"
+    }
+}

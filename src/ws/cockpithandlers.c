@@ -736,23 +736,60 @@ cockpit_handler_ping (CockpitWebServer *server,
 }
 
 gboolean
-cockpit_handler_auth(CockpitWebServer *server,
+cockpit_handler_cookie(CockpitWebServer *server,
                       CockpitWebRequest *request,
                       const gchar *path,
                       GHashTable *headers,
                       CockpitWebResponse *response,
-                      CockpitHandlerData *ws)
+                      CockpitHandlerData *data)
 {
   GHashTable *out_headers;
+  CockpitWebService *service;
+  const gchar *remainder = NULL;
+  gboolean resource;
+  JsonNode *node;
+  CockpitCreds *creds;
+  gchar *user;
+  GObject *object;
   const gchar *body;
   GBytes *content;
+
+  // Check for auth
+  service = cockpit_auth_check_cookie (data->auth, request);
+
+  if (!service)
+    return FALSE;
+
+  creds = cockpit_web_service_get_creds (service);
+  g_return_val_if_fail (creds != NULL, FALSE);
+
+  user = cockpit_creds_get_user (creds);
+  g_return_val_if_fail (user != NULL, FALSE);
 
   out_headers = cockpit_web_server_new_table ();
 
   g_hash_table_insert (out_headers, g_strdup ("Access-Control-Allow-Origin"), g_strdup ("*"));
 
   g_hash_table_insert (out_headers, g_strdup ("Content-Type"), g_strdup ("application/json"));
-  body ="{ \"service\": \"cockpit\" }";
+  
+
+  node = json_node_new (JSON_NODE_OBJECT);
+
+  /* This is sent back as the list of channel options to use */
+  object = json_object_new ();
+  json_object_set_string_member (object, "user", user);
+  json_object_set_string_member (object, "superuser", cockpit_creds_get_superuser(creds));
+  json_object_set_string_member (object, "application", cockpit_creds_get_application(creds));
+  json_object_set_string_member (object, "password", cockpit_creds_get_password(creds));
+  json_object_set_string_member (object, "csrf_token", cockpit_creds_get_csrf_token(creds));
+  json_object_set_string_member (object, "rhost", cockpit_creds_get_rhost(creds));
+  json_object_set_object_member (object, "login_data", cockpit_creds_get_login_data(creds));
+  json_node_set_object (node, object);
+  json_object_unref (object);
+
+  body = cockpit_json_write(node, NULL);
+
+  // body ="{ \"service\": \"cockpit\" }";
   content = g_bytes_new_static (body, strlen (body));
 
   cockpit_web_response_content (response, out_headers, content, NULL);

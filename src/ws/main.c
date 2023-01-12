@@ -247,10 +247,11 @@ main (int argc,
   g_signal_connect (server, "handle-resource::/ping",
                     G_CALLBACK (cockpit_handler_ping), &data);
 
-  /* Don't redirect to TLS for /auth */
-  g_object_set (server, "ssl-exception-prefix", "/auth", NULL);
-  g_signal_connect (server, "handle-resource::/auth",
-                    G_CALLBACK (cockpit_handler_auth), &data);
+
+  /* Don't redirect to TLS for /cookie */
+  g_object_set (server, "ssl-exception-prefix", "/cookie", NULL);
+  g_signal_connect (server, "handle-resource::/cookie",
+                    G_CALLBACK (cockpit_handler_cookie), &data);
 
   /* Files that cannot be cache-forever, because of well known names */
   g_signal_connect (server, "handle-resource::/favicon.ico",
