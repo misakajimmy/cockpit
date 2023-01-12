@@ -356,9 +356,9 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
 
         # On Arch Linux the ordering matters due to an auth include for system-remote-login
         if self.machine.image == "arch":
-            self.sed_file('1 a auth       required    /usr/lib/cockpit-test-assets/mock-pam-conv-mod.so', conf)
+            self.sed_file('1 a auth       required    mock-pam-conv-mod.so', conf)
         else:
-            self.sed_file('5 a auth       required    /usr/lib/cockpit-test-assets/mock-pam-conv-mod.so', conf)
+            self.sed_file('5 a auth       required    mock-pam-conv-mod.so', conf)
 
         m.start_cockpit()
         b.open("/system")
@@ -467,6 +467,8 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
         self.allow_journal_messages('.*type=1400.*avc:  denied .* comm="sudo".*')
         self.allow_journal_messages('.*type=1400.*avc:  denied .* comm="systemd".*')
         self.allow_journal_messages('.*type=1400.*avc:  denied  { watch } .* comm="cockpit-bridge".*')
+        self.allow_journal_messages('.*sudo:.* setresuid(.*): Operation not permitted')
+        self.allow_journal_messages('.*sudo: error initializing audit plugin sudoers_audit')
         # https://bugzilla.redhat.com/show_bug.cgi?id=1727887
         self.allow_journal_messages('.*type=1400.*avc:  denied  { connectto } .* path="/run/user/.*/bus" scontext=user_u:user_r:user_t:s0.*')
 
@@ -487,12 +489,11 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
         b.click(".super-channel button")
         b.wait_in_text(".super-channel span", 'result: ')
 
-        # This should work, but it will not because of
-        # https://bugzilla.redhat.com/show_bug.cgi?id=1814569
-        if m.image.startswith("fedora"):
-            self.assertIn('result: uid=0', b.text(".super-channel span"))
-        else:
+        if m.image.startswith("rhel-8") or m.image in ["centos-8-stream", "rhel-9-1"]:
+            # https://bugzilla.redhat.com/show_bug.cgi?id=1814569
             self.assertIn('result: access-denied', b.text(".super-channel span"))
+        else:
+            self.assertIn('result: uid=0', b.text(".super-channel span"))
 
     def testNoAdminGroup(self):
         m = self.machine
@@ -537,6 +538,25 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
         b.wait_not_visible("#login-fatal")
         b.wait_not_visible("#login")
         b.wait_not_visible("#login-details")
+
+    def testBypassSoftRequirements(self):
+        m = self.machine
+        b = self.browser
+
+        m.start_cockpit()
+        b.cdp.invoke("Page.addScriptToEvaluateOnNewDocument", source="""
+          window.CSS.supports = function() { return false; };
+        """)
+        b.open("/system")
+        b.wait_visible("#unsupported-browser")
+        b.wait_in_text("#show-other-login-options-text", "Bypass browser check")
+        b.click(".pf-c-expandable-section")
+
+        b.set_val('#login-user-input', "admin")
+        b.set_val('#login-password-input', "foobar")
+        b.click("#login-button")
+
+        self.check_shell()
 
     @skipImage("Starting on OSTree is weird", "fedora-coreos")
     def testFailingWebsocket(self, safari=False, cacert=False):
@@ -620,6 +640,8 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
             expect_fail_count(0, user=user)
             b.logout()
 
+        self.enable_root_login()
+
         # ensure we have no module in our pam config already
         # arch has faillock enabled by default
         if m.image != "arch":
@@ -701,13 +723,18 @@ account    required     pam_succeed_if.so user ingroup %s""" % m.get_admin_group
     @skipImage("root logins disabled by default with ssh", "fedora-coreos")
     def testPamAccess(self):
         b = self.browser
+        m = self.machine
 
-        # root login works by default
-        self.login_and_go("/system", user="root")
-        b.wait_visible('.system-information')
-        b.logout()
+        m.start_cockpit()
+        b.open("/system")
+
+        # root login is disabled by default via /etc/cockpit/disallowed-users on everything except RHEL 8
+        if not m.image.startswith("rhel-8") and not m.image.startswith("centos-8"):
+            b.try_login("root", "foobar")
+            b.wait_in_text("#login-error-message", "Wrong user name or password")
 
         # disable root login with pam_access
+        self.enable_root_login()
         self.write_file("/etc/security/access.conf", "- : root : ALL\n", append=True)
         self.sed_file("1 aaccount required pam_access.so", "/etc/pam.d/cockpit")
         b.try_login(user="root")

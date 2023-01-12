@@ -17,9 +17,10 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
+import 'cockpit-dark-theme'; // once per page
 import cockpit from "cockpit";
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 
 import { CockpitNav, CockpitNavItem, SidebarToggle } from "./nav.jsx";
 import { TopNav } from ".//topnav.jsx";
@@ -35,6 +36,16 @@ const _ = cockpit.gettext;
 function MachinesIndex(index_options, machines, loader) {
     if (!index_options)
         index_options = {};
+
+    const root = id => createRoot(document.getElementById(id));
+
+    // Document is guaranteed to be loaded at this point.
+    const sidebar_toggle_root = root('sidebar-toggle');
+    const early_failure_root = root('early-failure');
+    const early_failure_ready_root = root('early-failure-ready');
+    const topnav_root = root('topnav');
+    const hosts_sel_root = root('hosts-sel');
+    let host_apps_root = null;
 
     const page_status = { };
     sessionStorage.removeItem("cockpit:page_status");
@@ -72,7 +83,7 @@ function MachinesIndex(index_options, machines, loader) {
     /* Is troubleshooting dialog open */
     let troubleshooting_opened = false;
 
-    ReactDOM.render(<SidebarToggle />, document.getElementById('sidebar-toggle'));
+    sidebar_toggle_root.render(<SidebarToggle />);
 
     // Focus with skiplinks
     const skiplinks = document.getElementsByClassName("skiplink");
@@ -129,9 +140,9 @@ function MachinesIndex(index_options, machines, loader) {
             document.getElementById("early-failure").removeAttribute("hidden");
 
             const ca_cert_url = window.sessionStorage.getItem("CACertUrl");
-            ReactDOM.render(<EarlyFailure ca_cert_url={
+            early_failure_root.render(<EarlyFailure ca_cert_url={
                 (window.navigator.userAgent.indexOf("Safari") >= 0 && ca_cert_url) ? ca_cert_url : undefined
-            } />, document.getElementById('early-failure'));
+            } />);
             document.getElementById("main").setAttribute("hidden", "hidden");
             document.body.removeAttribute("hidden");
             return;
@@ -145,12 +156,12 @@ function MachinesIndex(index_options, machines, loader) {
         document.getElementById("early-failure").setAttribute("hidden", "hidden");
         document.getElementById("early-failure-ready").removeAttribute("hidden");
 
-        ReactDOM.render(
+        early_failure_ready_root.render(
             <EarlyFailureReady title={_("Disconnected")}
                                reconnect
                                watchdog_problem={watchdog_problem}
                                navigate={navigate}
-                               paragraph={cockpit.message(watchdog_problem)} />, document.getElementById('early-failure-ready'));
+                               paragraph={cockpit.message(watchdog_problem)} />);
     }
 
     /* Handles navigation */
@@ -213,11 +224,10 @@ function MachinesIndex(index_options, machines, loader) {
         if (!compiled)
             compiled = compile(machine);
 
-        ReactDOM.render(
+        topnav_root.render(
             <WithDialogs>
                 <TopNav index={index} state={state} machine={machine} compiled={compiled} />
-            </WithDialogs>,
-            document.getElementById("topnav"));
+            </WithDialogs>);
     }
 
     function update_navbar(machine, state, compiled) {
@@ -228,7 +238,10 @@ function MachinesIndex(index_options, machines, loader) {
             machine = machines.lookup(state.host);
 
         if (!machine || machine.state != "connected") {
-            ReactDOM.unmountComponentAtNode(document.getElementById("host-apps"));
+            if (host_apps_root) {
+                host_apps_root.unmount();
+                host_apps_root = null;
+            }
             return;
         }
 
@@ -280,10 +293,10 @@ function MachinesIndex(index_options, machines, loader) {
             }
 
             const new_item = Object.assign({}, item);
-            new_item.keyword = { score:-1 };
+            new_item.keyword = { score: -1 };
             if (!term)
                 return new_item;
-            const best_keyword = new_item.keywords.reduce(keyword_relevance, { score:-1 });
+            const best_keyword = new_item.keywords.reduce(keyword_relevance, { score: -1 });
             if (best_keyword.score > -1) {
                 new_item.keyword = best_keyword;
                 return new_item;
@@ -327,7 +340,7 @@ function MachinesIndex(index_options, machines, loader) {
                 name: _("Apps"),
                 items: compiled.ordered("dashboard"),
             }, {
-                name:  _("System"),
+                name: _("System"),
                 items: compiled.ordered("menu"),
             }, {
                 name: _("Tools"),
@@ -338,7 +351,9 @@ function MachinesIndex(index_options, machines, loader) {
         if (compiled.items.apps && groups.length === 3)
             groups[0].action = { label: _("Edit"), path: index.href({ host: machine.address, component: compiled.items.apps.path }) };
 
-        ReactDOM.render(
+        if (!host_apps_root)
+            host_apps_root = root('host-apps');
+        host_apps_root.render(
             React.createElement(CockpitNav, {
                 groups: groups,
                 selector: "host-apps",
@@ -347,8 +362,7 @@ function MachinesIndex(index_options, machines, loader) {
                 sorting: (a, b) => { return b.keyword.score - a.keyword.score },
                 current: state.component,
                 jump: index.jump,
-            }),
-            document.getElementById("host-apps"));
+            }));
 
         update_machines(state, machine);
     }
@@ -360,15 +374,14 @@ function MachinesIndex(index_options, machines, loader) {
         if (!machine)
             machine = machines.lookup(state.host);
 
-        ReactDOM.render(
+        hosts_sel_root.render(
             React.createElement(CockpitHosts, {
                 machine: machine || {},
                 machines: machines,
                 selector: "nav-hosts",
                 hostAddr: index.href,
                 jump: index.jump,
-            }),
-            document.getElementById("hosts-sel"));
+            }));
     }
 
     function update_title(label, machine) {
@@ -411,21 +424,25 @@ function MachinesIndex(index_options, machines, loader) {
         return component;
     }
 
+    let troubleshoot_dialog_root = null;
+
     function update_frame(machine, state, compiled) {
         function render_troubleshoot() {
             troubleshooting_opened = true;
             const template = codes[machine.problem] || "change-port";
-            ReactDOM.render(React.createElement(HostModal, {
+            if (!troubleshoot_dialog_root)
+                troubleshoot_dialog_root = root('troubleshoot-dialog');
+            troubleshoot_dialog_root.render(React.createElement(HostModal, {
                 template: template,
                 address: machine.address,
                 machines_ins: machines,
                 onClose: () => {
-                    ReactDOM.unmountComponentAtNode(document.getElementById('troubleshoot-dialog'));
+                    troubleshoot_dialog_root.unmount();
+                    troubleshoot_dialog_root = null;
                     troubleshooting_opened = false;
                     navigate(null, true);
                 }
-            }),
-                            document.getElementById('troubleshoot-dialog'));
+            }));
         }
 
         let current_frame = index.current_frame();
@@ -467,7 +484,7 @@ function MachinesIndex(index_options, machines, loader) {
             const reconnect = !connecting && machine.problem != "not-found" && !troubleshooting;
 
             document.querySelector("#early-failure-ready").removeAttribute("hidden");
-            ReactDOM.render(
+            early_failure_ready_root.render(
                 <EarlyFailureReady loading={connecting || restarting}
                                    title={title}
                                    reconnect={reconnect}
@@ -475,9 +492,7 @@ function MachinesIndex(index_options, machines, loader) {
                                    onTroubleshoot={render_troubleshoot}
                                    watchdog_problem={watchdog_problem}
                                    navigate={navigate}
-                                   paragraph={message} />,
-                document.getElementById('early-failure-ready')
-            );
+                                   paragraph={message} />);
 
             update_title(null, machine);
 
@@ -572,7 +587,7 @@ function message_queue(event) {
 }
 
 /* When we're being loaded into the index window we have additional duties */
-if (document.documentElement.getAttribute("class") === "index-page") {
+if (document.documentElement.classList.contains("index-page")) {
     /* Indicates to child frames that we are a cockpit1 router frame */
     window.name = "cockpit1";
 
@@ -594,8 +609,11 @@ if (document.documentElement.getAttribute("class") === "index-page") {
 
     let language = document.cookie.replace(/(?:(?:^|.*;\s*)CockpitLang\s*=\s*([^;]*).*$)|^.*$/, "$1");
     if (!language)
-        language = "en-us";
+        language = navigator.language.toLowerCase(); // Default to Accept-Language header
+
     document.documentElement.lang = language;
+    if (cockpit.language_direction)
+        document.documentElement.dir = cockpit.language_direction;
 
     window.addEventListener("message", message_queue, false);
 }

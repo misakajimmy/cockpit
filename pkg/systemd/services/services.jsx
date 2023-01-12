@@ -19,12 +19,12 @@
 
 import '../../lib/patternfly/patternfly-4-cockpit.scss';
 import 'polyfills'; // once per application
+import 'cockpit-dark-theme'; // once per page
 
 import React, { useState, useEffect, useCallback } from "react";
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import {
     Button,
-    Bullseye,
     Flex, FlexItem,
     Select, SelectVariant, SelectOption,
     Page, PageSection, PageSectionVariants,
@@ -37,7 +37,7 @@ import {
     ToolbarFilter,
     ToolbarToggleGroup,
 } from '@patternfly/react-core';
-import { SearchIcon, ExclamationCircleIcon, FilterIcon } from '@patternfly/react-icons';
+import { ExclamationCircleIcon, FilterIcon } from '@patternfly/react-icons';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { Service } from "./service.jsx";
@@ -68,6 +68,8 @@ export let clock_monotonic_now;
 
 export const SD_MANAGER = "org.freedesktop.systemd1.Manager";
 export const SD_OBJ = "/org/freedesktop/systemd1";
+
+const MAX_UINT64 = 2 ** 64 - 1;
 
 export function updateTime() {
     cockpit.spawn(["cat", "/proc/uptime"])
@@ -153,7 +155,6 @@ class ServicesPageBody extends React.Component {
             currentTextFilter: '',
 
             unit_by_path: {},
-            loadingUnits: false,
             isFullyLoaded: false,
 
             error: null,
@@ -245,10 +246,10 @@ class ServicesPageBody extends React.Component {
                     .catch(error => {
                         if (error.name != "org.freedesktop.systemd1.AlreadySubscribed" &&
                         error.name != "org.freedesktop.DBus.Error.FileExists")
-                            this.setState({ error: cockpit.format(_("Subscribing to systemd signals failed: $0"), error.toString()), loadingUnits: false });
+                            this.setState({ error: cockpit.format(_("Subscribing to systemd signals failed: $0"), error.toString()) });
                     });
         })
-                .catch(ex => this.setState({ error: cockpit.format(_("Connecting to dbus failed: $0"), ex.toString()), loadingUnits: false }));
+                .catch(ex => this.setState({ error: cockpit.format(_("Connecting to dbus failed: $0"), ex.toString()) }));
 
         cockpit.addEventListener("visibilitychange", () => {
             if (!cockpit.hidden) {
@@ -273,7 +274,7 @@ class ServicesPageBody extends React.Component {
             interface: "org.freedesktop.DBus.Properties",
             member: "PropertiesChanged"
         }, (path, iface, signal, args) => {
-            if (this.state.loadingUnits)
+            if (this.props.isLoading)
                 return;
 
             if (this.state.unit_by_path[path] &&
@@ -308,7 +309,7 @@ class ServicesPageBody extends React.Component {
 
         systemd_client[this.props.owner].subscribe({ interface: SD_MANAGER, member: "Reloading" }, (path, iface, signal, args) => {
             const reloading = args[0];
-            if (!reloading && !this.state.loadingUnits)
+            if (!reloading && !this.props.isLoading)
                 this.listUnits();
         });
 
@@ -393,7 +394,8 @@ class ServicesPageBody extends React.Component {
             return this.listFailedUnits();
 
         // Reinitialize the state variables for the units
-        this.setState({ loadingUnits: true, currentStatus: _("Listing units") });
+        this.setState({ currentStatus: _("Listing units") });
+        this.props.setIsLoading(true);
 
         this.seenPaths = new Set();
 
@@ -458,7 +460,10 @@ class ServicesPageBody extends React.Component {
                                         this.seenPaths.add(unit_path);
 
                                         return this.getUnitByPath(unit_path);
-                                    }, ex => this.setState({ error: cockpit.format(_("Loading unit failed: $0"), ex.toString()), loadingUnits: false })));
+                                    }, ex => {
+                                        this.props.isLoading(false);
+                                        this.setState({ error: cockpit.format(_("Loading unit failed: $0"), ex.toString()) });
+                                    }));
                                 });
 
                                 Promise.all(promisesLoad)
@@ -481,14 +486,20 @@ class ServicesPageBody extends React.Component {
                                             if (hasExtraEntries)
                                                 newState.unit_by_path = unit_by_path;
 
-                                            newState.loadingUnits = false;
                                             newState.isFullyLoaded = true;
+                                            this.props.setIsLoading(false);
 
                                             this.setState(newState);
                                             this.processFailedUnits();
                                         });
-                            }, ex => this.setState({ error: cockpit.format(_("Listing unit files failed: $0"), ex.toString()), loadingUnits: false }));
-                }, ex => this.setState({ error: cockpit.format(_("Listing units failed: $0"), ex.toString()), loadingUnits: false }));
+                            }, ex => {
+                                this.props.isLoading(false);
+                                this.setState({ error: cockpit.format(_("Listing unit files failed: $0"), ex.toString()) });
+                            });
+                }, ex => {
+                    this.props.isLoading(false);
+                    this.setState({ error: cockpit.format(_("Listing units failed: $0"), ex.toString()) });
+                });
     }
 
     /**
@@ -547,27 +558,24 @@ class ServicesPageBody extends React.Component {
             }
         }
         let next_run_time = 0;
-        if (timer_unit.NextElapseUSecRealtime === 0)
-            next_run_time = timer_unit.NextElapseUSecMonotonic + system_boot_time;
-        else if (timer_unit.NextElapseUSecMonotonic === 0)
+
+        // systemd puts -1 into an unsigned int type for the various *USec* properties
+        // JS rounds these to a float which is > MAX_UINT64, but the comparison works
+        if (timer_unit.NextElapseUSecRealtime > 0 && timer_unit.NextElapseUSecRealtime < MAX_UINT64) {
             next_run_time = timer_unit.NextElapseUSecRealtime;
-        else {
-            if (timer_unit.NextElapseUSecMonotonic + system_boot_time < timer_unit.NextElapseUSecRealtime)
-                next_run_time = timer_unit.NextElapseUSecMonotonic + system_boot_time;
-            else
-                next_run_time = timer_unit.NextElapseUSecRealtime;
+        } else if (timer_unit.NextElapseUSecMonotonic > 0 && timer_unit.NextElapseUSecMonotonic < MAX_UINT64) {
+            next_run_time = timer_unit.NextElapseUSecMonotonic + system_boot_time;
         }
+
         const nextRunTime = timeformat.dateTime(next_run_time / 1000);
         if (nextRunTime !== unit.NextRunTime) {
             unit.NextRunTime = nextRunTime;
             needsUpdate = true;
         }
 
-        if (timer_unit.NextElapseUSecMonotonic <= 0 && timer_unit.NextElapseUSecRealtime <= 0) {
-            if (unit.NextRunTime !== _("unknown")) {
-                unit.NextRunTime = _("unknown");
-                needsUpdate = true;
-            }
+        if (next_run_time === 0 && unit.NextRunTime !== _("unknown")) {
+            unit.NextRunTime = _("unknown");
+            needsUpdate = true;
         }
 
         if (needsUpdate) {
@@ -777,7 +785,7 @@ class ServicesPageBody extends React.Component {
             return <Service unitIsValid={unitId => { const path = get_unit_path(unitId); return path !== undefined && this.state.unit_by_path[path].LoadState != 'not-found' }}
                             owner={this.props.owner}
                             key={unit_id}
-                            loadingUnits={this.state.loadingUnits}
+                            loadingUnits={this.props.isLoading}
                             getUnitByPath={this.getUnitByPath}
                             unit={unit}
                             isPinned={this.state.pinnedUnits.includes(unit.path)}
@@ -838,28 +846,19 @@ class ServicesPageBody extends React.Component {
                 .sort(this.compareUnits);
 
         return (
-            <PageSection className="ct-pagesection-mobile">
+            <PageSection>
                 <Card isCompact>
                     <ServicesPageFilters activeStateDropdownOptions={activeStateDropdownOptions}
                                          fileStateDropdownOptions={fileStateDropdownOptions}
                                          filtersRef={this.filtersRef}
-                                         loadingUnits={this.state.loadingUnits}
+                                         loadingUnits={this.props.isLoading}
                                          onCurrentTextFilterChanged={this.onCurrentTextFilterChanged}
                                          onFiltersChanged={this.onFiltersChanged}
                     />
-                    {units.length
-                        ? <ServicesList key={cockpit.format("$0-list", activeTab)}
-                                     isTimer={activeTab == 'timer'}
-                                     units={units} />
-                        : null}
-                    {units.length == 0
-                        ? <Bullseye>
-                            <EmptyStatePanel icon={SearchIcon}
-                                            paragraph={_("No results match the filter criteria. Clear all filters to show results.")}
-                                            action={<Button id="clear-all-filters" onClick={() => { this.filtersRef.current() }} isInline variant='link'>{_("Clear all filters")}</Button>}
-                                            title={_("No matching results")} />
-                        </Bullseye>
-                        : null}
+                    <ServicesList key={cockpit.format("$0-list", activeTab)}
+                                  isTimer={activeTab == 'timer'}
+                                  filtersRef={this.filtersRef}
+                                  units={units} />
                 </Card>
             </PageSection>
         );
@@ -882,9 +881,6 @@ const ServicesPageFilters = ({
         fileState: [],
     });
 
-    /* Functions for controlling the toolbar's components
-     * FIXME: https://github.com/patternfly/patternfly-react/issues/5836
-     */
     const onSelect = (type, event, selection) => {
         const checked = event.target.checked;
 
@@ -993,7 +989,8 @@ const ServicesPageFilters = ({
         <Toolbar data-loading={loadingUnits}
                  clearAllFilters={onClearAllFilters}
                  className="pf-m-sticky-top ct-compact services-toolbar"
-                 id="services-toolbar">
+                 id="services-toolbar"
+                 numberOfFiltersText={n => cockpit.format("$0 filters applied")}>
             <ToolbarContent>{toolbarItems}</ToolbarContent>
         </Toolbar>
     );
@@ -1002,6 +999,7 @@ const ServicesPageFilters = ({
 const ServicesPage = () => {
     const [tabErrors, setTabErrors] = useState({});
     const [loggedUser, setLoggedUser] = useState();
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         cockpit.user()
@@ -1027,7 +1025,7 @@ const ServicesPage = () => {
         <WithDialogs>
             <Page>
                 {path.length == 0 &&
-                <PageSection variant={PageSectionVariants.light} type="nav" className="services-header ct-pagesection-mobile">
+                <PageSection variant={PageSectionVariants.light} type="nav" className="services-header">
                     <Flex>
                         <ServiceTabs activeTab={activeTab}
                                       tabErrors={tabErrors}
@@ -1046,7 +1044,7 @@ const ServicesPage = () => {
                                                                                           onChange={() => setOwner("user")} />
                             </ToggleGroup>}
                         </FlexItem>
-                        {activeTab == "timer" && owner == "system" && superuser.allowed && <CreateTimerDialog owner={owner} />}
+                        {activeTab == "timer" && owner == "system" && superuser.allowed && <CreateTimerDialog isLoading={isLoading} owner={owner} />}
                     </Flex>
                 </PageSection>}
                 <ServicesPageBody
@@ -1056,6 +1054,8 @@ const ServicesPage = () => {
                     path={path}
                     privileged={superuser.allowed}
                     setTabErrors={setTabErrors}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
                 />
             </Page>
         </WithDialogs>
@@ -1063,10 +1063,8 @@ const ServicesPage = () => {
 };
 
 function init() {
-    ReactDOM.render(
-        <ServicesPage />,
-        document.getElementById('services')
-    );
+    const root = createRoot(document.getElementById('services'));
+    root.render(<ServicesPage />);
 }
 
 document.addEventListener("DOMContentLoaded", init);

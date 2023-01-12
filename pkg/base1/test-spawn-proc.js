@@ -91,6 +91,16 @@ QUnit.test("error message fail", function (assert) {
             });
 });
 
+QUnit.test("nonexisting executable", assert => {
+    assert.rejects(cockpit.spawn(["/bin/nonexistent"]),
+                   ex => ex.problem == "not-found");
+});
+
+QUnit.test("permission denied", assert => {
+    assert.rejects(cockpit.spawn(["/etc/hostname"]),
+                   ex => ex.problem == "access-denied");
+});
+
 QUnit.test("write eof read", function (assert) {
     const done = assert.async();
     assert.expect(2);
@@ -294,6 +304,18 @@ QUnit.test("script without args", function (assert) {
 
     proc.input("2\n", true);
     proc.input("3\n1\n");
+});
+
+QUnit.test("pty", async function (assert) {
+    const proc = cockpit.spawn(['sh', '-c', "tty; test -t 0"], { pty: true });
+    const output = await proc.done();
+    assert.equal(output.indexOf('/dev/pts'), 0, 'TTY is a pty: ' + output);
+});
+
+QUnit.test("pty window size", async function (assert) {
+    const proc = cockpit.spawn(['tput', 'lines', 'cols'], { pty: true, window: { rows: 77, cols: 88 } });
+    const output = await proc.done();
+    assert.equal(output, '77\r\n88\r\n', 'Correct rows and columns');
 });
 
 QUnit.test("stream large output", function (assert) {

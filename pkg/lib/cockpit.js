@@ -933,7 +933,7 @@ function Channel(options) {
         if (!options)
             options = { };
         else if (typeof options == "string")
-            options = { problem : options };
+            options = { problem: options };
         options.command = "close";
         options.channel = id;
 
@@ -2459,6 +2459,10 @@ function factory() {
         const self = this;
         const application = cockpit.transport.application();
         self.url_root = url_root || "";
+
+        if (window.mock && window.mock.url_root)
+            self.url_root = window.mock.url_root;
+
         if (application.indexOf("cockpit+=") === 0) {
             if (self.url_root)
                 self.url_root += '/';
@@ -2501,13 +2505,14 @@ function factory() {
                 path = decode_path(path);
 
             let href = "/" + path.map(encodeURIComponent).join("/");
-            if (with_root && self.url_root && href.indexOf("/" + self.url_root + "/" !== 0))
+            if (with_root && self.url_root && href.indexOf("/" + self.url_root + "/") !== 0)
                 href = "/" + self.url_root + href;
 
             /* Undo unnecessary encoding of these */
-            href = href.replace("%40", "@");
-            href = href.replace("%3D", "=");
-            href = href.replace(/%2B/g, "+");
+            href = href.replaceAll("%40", "@");
+            href = href.replaceAll("%3D", "=");
+            href = href.replaceAll("%2B", "+");
+            href = href.replaceAll("%23", "#");
 
             let opt;
             const query = [];
@@ -2633,9 +2638,9 @@ function factory() {
     cockpit.jump = function jump(path, host) {
         if (Array.isArray(path))
             path = "/" + path.map(encodeURIComponent).join("/")
-.replace("%40", "@")
-.replace("%3D", "=")
-.replace(/%2B/g, "+");
+.replaceAll("%40", "@")
+.replaceAll("%3D", "=")
+.replaceAll("%2B", "+");
         else
             path = "" + path;
 
@@ -2929,7 +2934,8 @@ function factory() {
             iface: { value: iface, enumerable: false, writable: false },
             valid: { get: function() { return valid }, enumerable: false },
             wait: {
- enumerable: false, writable: false,
+                enumerable: false,
+                writable: false,
                 value: function(func) {
                     if (func)
                         waits.promise.always(func);
@@ -2937,9 +2943,10 @@ function factory() {
                 }
             },
             call: {
- value: function(name, args, options) { return client.call(path, iface, name, args, options) },
-                      enumerable: false, writable: false
-},
+                value: function(name, args, options) { return client.call(path, iface, name, args, options) },
+                enumerable: false,
+                writable: false
+            },
             data: { value: { }, enumerable: false }
         });
 
@@ -3054,7 +3061,8 @@ function factory() {
             iface: { value: iface, enumerable: false, writable: false },
             path_namespace: { value: path_namespace, enumerable: false, writable: false },
             wait: {
- enumerable: false, writable: false,
+                enumerable: false,
+                writable: false,
                 value: function(func) {
                     if (func)
                         waits.always(func);
@@ -3478,7 +3486,7 @@ function factory() {
                 iface = name;
             iface = String(iface);
             if (!path)
-                path = "/" + iface.replace(/\./g, "/");
+                path = "/" + iface.replaceAll(".", "/");
             let Constructor = self.constructors[iface];
             if (!Constructor)
                 Constructor = self.constructors["*"];
@@ -3815,9 +3823,11 @@ function factory() {
     let po_plural;
 
     cockpit.language = "en";
+    cockpit.language_direction = "ltr";
 
     cockpit.locale = function locale(po) {
         let lang = cockpit.language;
+        let lang_dir = cockpit.language_direction;
         let header;
 
         if (po) {
@@ -3832,9 +3842,12 @@ function factory() {
                 po_plural = header["plural-forms"];
             if (header.language)
                 lang = header.language;
+            if (header["language-direction"])
+                lang_dir = header["language-direction"];
         }
 
         cockpit.language = lang;
+        cockpit.language_direction = lang_dir;
     };
 
     cockpit.translate = function translate(/* ... */) {

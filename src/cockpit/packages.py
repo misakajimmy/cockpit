@@ -216,7 +216,8 @@ class Packages:
             if item.is_dir():
                 try:
                     package = Package(item)
-                except FileNotFoundError:
+                except (FileNotFoundError, json.JSONDecodeError):
+                    # ignore packages with broken/empty manifests
                     continue
 
                 if package.name in self.packages:
@@ -254,7 +255,7 @@ class Packages:
     def serve_manifests_js(self, channel):
         channel.http_ok('text/javascript')
         manifests = {name: package.manifest for name, package in self.packages.items()}
-        channel.send_data(('''
+        channel.send_data(("""
             (function (root, data) {
                 if (typeof define === 'function' && define.amd) {
                     define(data);
@@ -265,7 +266,7 @@ class Packages:
                 } else {
                     root.manifests = data;
                 }
-            }(this, ''' + json.dumps(manifests) + '''))''').encode('ascii'))
+            }(this, """ + json.dumps(manifests) + """))""").encode('ascii'))
 
     def serve_package_file(self, path, channel):
         package, _, package_path = path[1:].partition('/')

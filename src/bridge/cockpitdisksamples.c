@@ -135,14 +135,19 @@ cockpit_disk_samples (CockpitSamples *samples)
           && g_ascii_isdigit (dev_name[strlen (dev_name) - 1]))
         continue;
 
+      // ignore nvme partitions
+      if (g_str_has_prefix (dev_name, "nvme") && g_strrstr (dev_name, "p"))
+        continue;
+
       bytes_read += num_sectors_read * 512;
       bytes_written += num_sectors_written * 512;
       num_ops += num_reads_merged + num_writes_merged;
+      cockpit_samples_sample (samples, "disk.dev.read", dev_name, num_sectors_read * 512);
+      cockpit_samples_sample (samples, "disk.dev.written", dev_name, num_sectors_written * 512);
     }
 
   cockpit_samples_sample (samples, "disk.all.read", NULL, bytes_read);
   cockpit_samples_sample (samples, "disk.all.written", NULL, bytes_written);
-  cockpit_samples_sample (samples, "disk.all.ops", NULL, num_ops);
 
 out:
   g_strfreev (lines);

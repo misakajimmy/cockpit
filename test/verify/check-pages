@@ -21,7 +21,7 @@ import time
 import os
 
 import parent  # noqa: F401
-from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, test_main
+from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main
 
 RHEL_DOC_BASE = "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_systems_using_the_rhel_8_web_console"
 
@@ -64,6 +64,7 @@ class TestPages(MachineCase):
         self.browser.click(".display-language-menu")
         self.browser.wait_visible('#display-language-modal')
 
+    @todoPybridge()
     def testBasic(self):
         m = self.machine
         b = self.browser
@@ -298,14 +299,19 @@ OnCalendar=daily
 
             b.wait_js_func("""(function (lang) {
                 let correct = true;
+                const rtl_langs = ["ar-eg", "fa-ir", "he-il", "ur-in"];
+                const dir = rtl_langs.includes(lang) ? "rtl" : "ltr";
                 document.querySelectorAll('#content iframe').forEach(el => {
                     if (el.contentDocument.documentElement.lang !== lang)
+                        correct = false;
+                    if (el.contentDocument.documentElement.dir !== dir)
                         correct = false;
                 });
                 return correct;
             })""", language)
             b.wait_attr(".index-page", "lang", language)
 
+    @todoPybridge()
     def testPtBRLocale(self):
         m = self.machine
         b = self.browser
@@ -400,6 +406,7 @@ OnCalendar=daily
 
         self.allow_restart_journal_messages()
 
+    @todoPybridge()
     def testShellReload(self):
         b = self.browser
         m = self.machine
@@ -413,12 +420,16 @@ OnCalendar=daily
         b.reload()
         self.check_system_menu("FOO!", True)
 
+    @todoPybridge()
     def testMenuSearch(self):
         b = self.browser
         m = self.machine
 
         # On Ubuntu and Debian we would need to generate locales - just ignore it
         self.allow_journal_messages("invalid or unusable locale: de_DE.UTF-8")
+
+        # Clean up failed services for screenshots
+        m.execute("systemctl reset-failed")
 
         self.login_and_go()
 
@@ -450,8 +461,6 @@ OnCalendar=daily
         b.wait_text("#host-apps li a:contains('Services')", "ServicesContains: systemd")
         b.wait_text("#host-apps li a:contains('Services') mark", "systemd")
 
-        # Clean up failed services for screenshots
-        m.execute("systemctl reset-failed")
         b.wait_not_present("#services-error")
         b.assert_pixels("#nav-system", "menu-search", skip_layouts=["mobile"])
         b.set_layout("mobile")
@@ -612,6 +621,7 @@ OnCalendar=daily
         b.wait_in_text("#file-autocomplete-widget li:nth-of-type(4) button", "other")
 
     @skipImage("No PCP available", "fedora-coreos")
+    @todoPybridge()
     def testPlots(self):
         b = self.browser
         m = self.machine

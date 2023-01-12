@@ -51,7 +51,7 @@ function child_frame() {
     let spawn_done = false;
     let binary_done = false;
 
-    const promise = cockpit.spawn(["/bin/sh", "-c", "echo hi"], { host : "localhost" })
+    const promise = cockpit.spawn(["/bin/sh", "-c", "echo hi"], { host: "localhost" })
             .then(resp => {
                 assert.equal(resp, "hi\n", "framed channel got output");
             })
@@ -59,14 +59,15 @@ function child_frame() {
                 assert.equal(promise.state(), "resolved", "framed channel closed");
                 assert.equal(cockpit.transport.host, "frame_host", "framed cockpit.transport.host");
                 spawn_done = true;
-                if (spawn_done && binary_done) {
+                if (binary_done) {
                     cockpit.transport.close();
                 }
             });
 
     const channel = cockpit.channel({
-        payload: "echo", binary: true,
-        host : "localhost"
+        payload: "echo",
+        binary: true,
+        host: "localhost"
     });
     channel.addEventListener("message", function(ev, payload) {
         assert.equal(typeof payload[0], "number", "binary channel got a byte array");
@@ -82,7 +83,7 @@ function child_frame() {
     channel.addEventListener("close", (ev, options) => {
         assert.notOk(options.reason, "binary channel close cleanly");
         binary_done = true;
-        if (spawn_done && binary_done)
+        if (spawn_done)
             cockpit.transport.close();
     });
 

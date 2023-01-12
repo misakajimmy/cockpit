@@ -20,9 +20,10 @@
 import cockpit from "cockpit";
 import React from "react";
 import {
-    Button, Dropdown, DropdownItem, DropdownPosition, DropdownSeparator, DropdownToggle,
+    Button, Dropdown, DropdownGroup, DropdownItem, DropdownPosition, DropdownSeparator, DropdownToggle,
     Masthead, MastheadContent,
     Spinner,
+    ToggleGroup, ToggleGroupItem,
     Toolbar, ToolbarItem, ToolbarContent,
 } from '@patternfly/react-core';
 import { CogIcon, ExternalLinkAltIcon, HelpIcon } from '@patternfly/react-icons';
@@ -58,12 +59,27 @@ export class TopNav extends React.Component {
             menuOpened: false,
             showActivePages: false,
             osRelease: {},
+            theme: localStorage.getItem('shell:style') || 'auto',
         };
 
         this.superuser_connection = null;
         this.superuser = null;
 
         read_os_release().then(os => this.setState({ osRelease: os || {} }));
+
+        this.handleClickOutside = () => this.setState({ menuOpened: false, docsOpened: false });
+    }
+
+    componentDidMount() {
+        /* This is a HACK for catching lost clicks on the pages which live in iframes so as to close dropdown menus on the shell.
+         * Note: Clicks on an <iframe> element won't trigger document.documentElement listeners, because it's literally different page with different security domain.
+         * However, when clicking on an iframe moves focus to its content's window that triggers the main window.blur event.
+         */
+        window.addEventListener("blur", this.handleClickOutside);
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener("blur", this.handleClickOutside);
     }
 
     static getDerivedStateFromProps(nextProps, prevState) {
@@ -84,6 +100,20 @@ export class TopNav extends React.Component {
         }
 
         return null;
+    }
+
+    handleModeClick = (isSelected, event) => {
+        const theme = event.currentTarget.id;
+        this.setState({ theme: theme });
+
+        const styleEvent = new CustomEvent("cockpit-style", {
+            detail: {
+                style: theme,
+            }
+        });
+        window.dispatchEvent(styleEvent);
+
+        localStorage.setItem("shell:style", theme);
     }
 
     render() {
@@ -140,6 +170,22 @@ export class TopNav extends React.Component {
                 <SuperuserIndicator proxy={this.superuser} host={this.props.machine.connection_string} />
             </div>,
             <DropdownSeparator key="separator2" className="mobile_v" />,
+            <DropdownGroup label={_("Style")} key="dark-switcher">
+                <DropdownItem key="dark-switcher-menu" component="div" isPlainText>
+                    <ToggleGroup key="dark-switcher-togglegroup">
+                        <ToggleGroupItem key="dark-switcher-auto" buttonId="auto" text={_("Default")}
+                                isSelected={this.state.theme === "auto"}
+                                onChange={this.handleModeClick} />
+                        <ToggleGroupItem key="dark-switcher-light" buttonId="light" text={_("Light")}
+                                isSelected={this.state.theme === "light"}
+                                onChange={this.handleModeClick} />
+                        <ToggleGroupItem key="dark-switcher-dark" buttonId="dark" text={_("Dark")}
+                                isSelected={this.state.theme === "dark"}
+                                onChange={this.handleModeClick} />
+                    </ToggleGroup>
+                </DropdownItem>
+            </DropdownGroup>,
+            <DropdownSeparator key="separatorDark" />,
         ];
 
         if (manifest.locales)
@@ -212,7 +258,7 @@ export class TopNav extends React.Component {
                                         document.getElementById("toggle-menu").focus();
                                     }}
                                     toggle={
-                                        <DropdownToggle id="toggle-menu" icon={<CogIcon size="md" />} onToggle={(isOpen, ev) => { if (ev.target.id !== "toggle-menu") return; this.setState({ menuOpened: isOpen, showActivePages: ev.altKey }) }}>
+                                        <DropdownToggle id="toggle-menu" icon={<CogIcon size="md" />} onToggle={(isOpen, ev) => this.setState({ menuOpened: isOpen, showActivePages: ev.altKey }) }>
                                             {_("Session")}
                                         </DropdownToggle>
                                     }

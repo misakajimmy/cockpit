@@ -39,9 +39,11 @@ to wrap around when there isn't enough space.
   flex-wrap: wrap;
 }
 
+/* Fix select menu rendering */
 ul.pf-c-select__menu {
-  max-width: 20rem;
-  max-height: 20rem;
+  /* Don't get too tall */
+  max-height: min(20rem, 50vh);
+  /* Don't have a horizontal scrollbar */
   overflow-y: auto;
 }
 
@@ -97,7 +99,7 @@ svg {
   // https://github.com/patternfly/patternfly/issues/3959
   --pf-c-card__header-toggle--MarginTop: 0;
 
-  .pf-c-card__header {
+  .pf-c-card__header:not(.ct-card-expandable-header){
     // upstream fix (pending): https://github.com/patternfly/patternfly/pull/3714
     flex-wrap: wrap;
     row-gap: var(--pf-global--spacer--sm);
@@ -241,4 +243,171 @@ svg {
 // Nevertheless, Cockpit needs to be adapted for this to work as expected.
 .pf-c-breadcrumb__link {
   cursor: pointer;
+}
+
+//Page headers are inconsistent with shadows and borders
+// https://github.com/patternfly/patternfly/issues/5184
+.pf-c-page__main-group,
+.pf-c-page__main-nav,
+.pf-c-page__main-section.pf-m-light:not(:last-child) {
+  z-index: var(--pf-c-page--section--m-shadow-bottom--ZIndex);
+  box-shadow: var(--pf-c-page--section--m-shadow-bottom--BoxShadow);
+}
+
+// Dark mode fixes for several PF components
+.pf-theme-dark {
+  // Fix dropmarker showing as check icon
+  // https://github.com/patternfly/patternfly/issues/5215
+  .pf-c-form-control {
+    --pf-c-form-control__select--BackgroundUrl: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 512'%3E%3Cpath fill='%23e0e0e0' d='M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z'/%3E%3C/svg%3E");
+  }
+
+  // Fix PF disabled colors
+  :disabled, .pf-m-disabled, .pf-m-aria-disabled {
+    // Darken background; otherwise it matches active dropdowns and inputs
+    --pf-c-button--disabled--BackgroundColor: var(--pf-global--BackgroundColor--dark-300);
+    // Bump up text to AA contrast, from PF color 400
+    --pf-c-button--disabled--Color: #8d9093;
+  }
+
+  // Fix PF disabled colors again, for modals
+  .pf-c-modal-box :is(:disabled, .pf-m-disabled, .pf-m-aria-disabled) {
+    // Alter background again, otherwise it matches modal background
+    --pf-c-button--disabled--BackgroundColor: var(--pf-global--BackgroundColor--dark-400);
+  }
+
+  // Change background color behind cards
+  // (matches PF surge website; PF doesn't specify otherwise)
+  .pf-c-page__main-section {
+    --pf-c-page__main-section--BackgroundColor: var(--pf-global--BackgroundColor--dark-300);
+  }
+
+  // Adapt breadcrumb bar to be similar color as PF website
+  // (We use header bars in slightly different ways from PF)
+  .pf-c-page__main-breadcrumb,
+  .pf-c-page__main-breadcrumb + .pf-c-page__main-section {
+    --pf-c-page__main-breadcrumb--BackgroundColor: var(--pf-global--BackgroundColor--dark-100);
+    background-color: var(--pf-global--BackgroundColor--dark-100);
+  }
+
+  // Fix input group background and borders
+  // (Looks fixed in PF5, but not in PF4)
+  .pf-c-text-input-group {
+    background-color: var(--pf-global--BackgroundColor--400);
+
+    .pf-c-text-input-group__text {
+      &::before {
+        border-top-color: transparent;
+        border-right-color: transparent;
+        border-left-color: transparent;
+      }
+
+      &:is(:focus,:hover)::after {
+        border-bottom-color: var(--pf-global--active-color--100);
+      }
+
+      &:not(:focus):not(:hover)::after {
+        border-bottom-color: var(--pf-global--BorderColor--400);
+      }
+    }
+  }
+
+    // PatternFly doesn't define gold color in dark mode
+  .pf-c-label {
+    --pf-c-label--m-gold--BackgroundColor: var(--pf-global--BackgroundColor--300);
+    --pf-c-label--m-gold__content--Color: var(--pf-global--palette--gold-100);
+
+    &.pf-m-gold {
+      --pf-c-label__content--Color: var(--pf-c-label--m-gold__content--Color);
+    }
+  }
+}
+
+// Override PF to fix Right to Left languages
+[dir="rtl"] {
+  // Flip outlines for buttons
+  .pf-m-split-button {
+    button::before {
+      transform: scaleX(-100%);
+    }
+  }
+
+  // Swap image padding in buttons
+  .pf-c-dropdown__toggle-image {
+    margin-right: unset;
+    gap: var(--pf-c-dropdown__toggle-image--MarginRight);
+  }
+
+  // PatternFly and us are setting text-align to the left.
+  // It needs to be to the start.
+  // We should change it to start where we can.
+  // Meanwhile, here's an override just for RTL.
+  body, td, th {
+    text-align: start;
+  }
+
+  // Swap side of selected nav's blue line
+  .pf-c-nav__link.pf-m-current {
+    &, &:hover, &:not(.pf-m-expanded) .pf-c-nav__link {
+      &::after {
+        width: 100%;
+        transform: scaleX(-100%);
+      }
+    }
+  }
+
+  // Toolbar content (as seen in the shell) should be left aligned in RTL
+  // See: https://github.com/patternfly/patternfly/issues/3812
+  .pf-c-toolbar__content {
+    margin-right: auto;
+    margin-left: 0;
+  }
+
+  // Dropdown toggles: Swap image margins to be on left instead
+  .pf-c-dropdown__toggle {
+    &-image {
+      margin-right: 0;
+      margin-left: var(--pf-c-dropdown__toggle-image--MarginRight);
+    }
+
+    &-icon {
+      margin-right: var(--pf-c-dropdown__toggle-icon--MarginLeft);
+      margin-left: var(--pf-c-dropdown__toggle-icon--MarginRight);
+    }
+  }
+
+  // Flip popup directions, part 1 of 2
+  .pf-c-dropdown .pf-c-menu.pf-m-align-right,
+  .pf-c-dropdown__menu.pf-m-align-right {
+    right: unset;
+    left: 0;
+  }
+
+  // Flip popup directions, part 2 of 2
+  .pf-c-dropdown .pf-c-menu.pf-m-align-left,
+  .pf-c-dropdown__menu.pf-m-align-left {
+    right: 0;
+    left: unset;
+  }
+
+  // Another case of aligning to the left instead of start
+  .pf-c-dropdown__menu-item {
+    text-align: start;
+  }
+
+  // Flip breadcrum divider
+  .pf-c-breadcrumb__item-divider {
+    transform: scaleX(-100%);
+  }
+}
+
+// Drop side padding in mobile mode,
+// intended mainly for PF PageSection elements (pf-c-page__main-section).
+// It's similar to adding padding={{ default: 'noPadding', sm: 'padding' }},
+// except this only affects the sides, not the top and bottom.
+@media screen and (max-width: $pf-global--breakpoint--sm) {
+  .pf-c-page__main > section.pf-c-page__main-section:not(.pf-m-padding) {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }

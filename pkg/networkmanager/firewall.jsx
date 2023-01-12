@@ -18,9 +18,10 @@
  */
 
 import '../lib/patternfly/patternfly-4-cockpit.scss';
+import 'cockpit-dark-theme'; // once per page
 import cockpit from "cockpit";
 import React, { useState } from 'react';
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import {
     Alert, Button,
     Breadcrumb, BreadcrumbItem,
@@ -591,9 +592,6 @@ class AddEditServicesModal extends React.Component {
                    onClose={Dialogs.close}
                    title={titleText}
                    footer={<>
-                       {
-                           this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />
-                       }
                        { !this.state.custom ||
                            <Alert variant="warning"
                                isInline
@@ -608,6 +606,9 @@ class AddEditServicesModal extends React.Component {
                    </>}
             >
                 <Form isHorizontal onSubmit={this.props.custom_id ? this.edit : this.save}>
+                    {
+                        this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />
+                    }
                     { !!this.props.custom_id ||
                         <FormGroup className="add-services-dialog-type" isInline>
                             <Radio name="type"
@@ -798,9 +799,6 @@ class ActivateZoneModal extends React.Component {
                    onClose={Dialogs.close}
                    title={_("Add zone")}
                    footer={<>
-                       {
-                           this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />
-                       }
                        <Button variant="primary" onClick={this.save} isDisabled={this.state.zone === null ||
                                                                                (this.state.interfaces.size === 0 && this.state.ipRange === "ip-entire-subnet") ||
                                                                                (this.state.ipRange === "ip-range" && !this.state.ipRangeValue)}>
@@ -812,6 +810,9 @@ class ActivateZoneModal extends React.Component {
                    </>}
             >
                 <Form isHorizontal onSubmit={this.save}>
+                    {
+                        this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />
+                    }
                     <FormGroup label={ _("Trust level") } className="add-zone-zones">
                         <Flex>
                             <FlexItem className="add-zone-zones-firewalld">
@@ -1056,7 +1057,7 @@ export class Firewall extends React.Component {
                               { enabled && !firewall.readonly && <span className="btn-group">{addZoneAction}</span> }
                           </Flex>
                       </PageSection>}>
-                <PageSection id="zones-listing" className="ct-pagesection-mobile">
+                <PageSection id="zones-listing">
                     { enabled && <Stack hasGutter>
                         {
                             zones.map(z => <ZoneSection key={z.id}
@@ -1077,6 +1078,6 @@ export class Firewall extends React.Component {
 
 document.addEventListener("DOMContentLoaded", () => {
     document.title = cockpit.gettext(document.title);
-
-    ReactDOM.render(<WithDialogs><Firewall /></WithDialogs>, document.getElementById("firewall"));
+    const root = createRoot(document.getElementById("firewall"));
+    root.render(<WithDialogs><Firewall /></WithDialogs>);
 });

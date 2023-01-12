@@ -491,8 +491,21 @@ session_has_known_host_in_file (const gchar *file,
                                 const gchar *host,
                                 const guint port)
 {
+  /* HACK - https://gitlab.com/libssh/libssh-mirror/-/issues/156
+
+     Calling ssh_session_has_known_hosts_entry will call
+     ssh_options_apply, after which the ssh_session structure can no
+     longer be used with ssh_session_connect. So we make a copy and
+     call ssh_session_has_known_hosts_entry on that.
+  */
+
+  ssh_session tmp_session;
+  gboolean result;
   g_warn_if_fail (ssh_options_set (data->session, SSH_OPTIONS_KNOWNHOSTS, file) == 0);
-  return ssh_session_has_known_hosts_entry (data->session) == SSH_KNOWN_HOSTS_OK;
+  ssh_options_copy (data->session, &tmp_session);
+  result = ssh_session_has_known_hosts_entry (tmp_session) == SSH_KNOWN_HOSTS_OK;
+  ssh_free (tmp_session);
+  return result;
 }
 
 static gboolean
@@ -840,6 +853,50 @@ do_password_auth (CockpitSshData *data)
   return rc;
 }
 
+#ifdef HAVE_SSH_USERAUTH_PUBLICKEY_AUTO_GET_CURRENT_IDENTITY
+
+static int
+intercept_prompt (const char *prompt, char *buf, size_t len,
+                  int echo, int verify, void *userdata)
+{
+  CockpitSshData *data = userdata;
+  char *identity = NULL;
+  if (ssh_userauth_publickey_auto_get_current_identity (data->session, &identity) == SSH_OK)
+    {
+      data->problem_error = g_strdup_printf ("locked identity: %s", identity);
+      ssh_string_free_char (identity);
+    }
+  return -1;
+}
+
+static int
+do_auto_auth (CockpitSshData *data)
+{
+  struct ssh_callbacks_struct cb = { .userdata = data, .auth_function = intercept_prompt };
+  ssh_callbacks_init (&cb);
+  ssh_set_callbacks (data->session, &cb);
+  int rc = ssh_userauth_publickey_auto (data->session, NULL, NULL);
+  ssh_set_callbacks (data->session, NULL);
+  return rc;
+}
+
+#else
+
+/* When prompting for a key passphrase, versions of libssh without
+   ssh_userauth_publickey_auto_get_current_identity don't provide
+   enough information to say which key it is for.  We need that
+   information since Cockpit will offer to load the key into the agent
+   in order to log in.
+
+   Thus, we have to reimplement ssh_userauth_publickey_auto to get the
+   necessary information.
+
+   We would like to iterate over all configured identities, the same
+   way that the real ssh_userauth_publickey does, but there is no
+   API to do that either.  So we hard code all the names, based on
+   what ssh-add would add to the agent.
+*/
+
 struct CockpitSshPromptData {
   CockpitSshData *data;
   const gchar *identity;
@@ -860,50 +917,6 @@ prompt_for_identity_password (const char *prompt, char *buf, size_t len,
 static int
 do_auto_auth (CockpitSshData *data)
 {
-  /* HACK: When prompting for a key passphrase, libssh doesn't provide
-     enough information to say which key it is for, but we need that
-     information since Cockpit will offer to load the key into the
-     agent in order to log in.
-
-     To get this information, we reimplement
-     ssh_userauth_publickey_auto here in a way that passes that
-     information to the callback.
-
-     We would like to iterate over all configured identities, the same
-     way that the real ssh_userauth_publickey does, but there is no
-     API to do that either.  So we hard code all the names, based on
-     what ssh-add would add to the agent.
-
-     This whole thing is meant to be replaced with something like this
-     eventually:
-
-     static int
-     intercept_prompt (const char *prompt, char *buf, size_t len,
-                       int echo, int verify, void *userdata)
-     {
-       CockpitSshData *data = userdata;
-       char *identity = NULL;
-       if (ssh_userauth_publickey_auto_get_current_identity (data->session, &identity) == SSH_OK)
-         {
-           data->problem_error = g_strdup_printf ("locked identity: %s", identity);
-           ssh_string_free_char (identity);
-         }
-       return -1;
-     }
-
-     static int
-     do_auto_auth (CockpitSshData *data)
-     {
-       struct ssh_callbacks_struct cb = { .userdata = data, .auth_function = intercept_prompt };
-       ssh_callbacks_init (&cb);
-       ssh_set_callbacks (data->session, &cb);
-       int rc = ssh_userauth_publickey_auto (data->session, NULL, NULL);
-       ssh_set_callbacks (data->session, NULL);
-       return rc;
-     }
-
-     See https://gitlab.com/libssh/libssh-mirror/-/merge_requests/134
-  */
 
   int rc;
   const gchar *msg;
@@ -1019,6 +1032,8 @@ do_auto_auth (CockpitSshData *data)
   ssh_string_free_char (libssh_identity);
   return rc;
 }
+
+#endif
 
 static int
 do_key_auth (CockpitSshData *data)
@@ -2025,6 +2040,8 @@ on_pipe_close (CockpitPipe *pipe,
 
   if (!self->received_eof)
     dispatch_eof (self);
+
+  cockpit_relay_disconnect (self, NULL);
 }
 
 typedef struct {

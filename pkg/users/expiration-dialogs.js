@@ -48,6 +48,7 @@ function AccountExpirationDialogBody({ state, errors, change }) {
                                            invalidFormatText=""
                                            id="account-expiration-input"
                                            value={date}
+                                           appendTo={() => document.body}
                                            isDisabled={mode !== "expires"} />
                            </Flex>
                        }
@@ -118,7 +119,7 @@ export function account_expiration_dialog(account, expire_date) {
                             } else
                                 prog.push("");
                             prog.push(account.name);
-                            return cockpit.spawn(prog, { superuser : true, err: "message" });
+                            return cockpit.spawn(prog, { superuser: true, err: "message" });
                         } else {
                             update();
                             return Promise.reject();

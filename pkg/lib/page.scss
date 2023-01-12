@@ -1,4 +1,5 @@
 @use "@patternfly/patternfly/base/patternfly-themes.scss";
+@use "@patternfly/patternfly/patternfly-theme-dark.scss";
 @use "./patternfly/patternfly-4-overrides.scss";
 @import "global-variables";
 @import "@patternfly/patternfly/components/Page/page.scss";
@@ -83,6 +84,10 @@ a.disabled:hover {
   --ct-animation-new-background: #fdf4dd;
 }
 
+.pf-theme-dark {
+  --ct-animation-new-background: #353428;
+}
+
 /* Animation background is instantly yellow and fades out halfway through */
 @keyframes ctNewRow {
   0% {
@@ -158,6 +163,12 @@ a.disabled:hover {
   --ct-color-list-critical-alert-text: var(--pf-global--palette--red-200);
 }
 
+.pf-theme-dark {
+  --ct-color-list-critical-bg        : #261213; // red-100 mixed with black-850 @ 20%
+  --ct-color-list-critical-border    : var(--pf-global--danger-color--200);
+  --ct-color-list-critical-alert-text: var(--pf-global--palette--red-8888);
+}
+
 [hidden] { display: none !important; }
 
 // Let PF4 handle the scrolling through page component otherwise we might get double scrollbar
@@ -189,15 +200,4 @@ html:not(.index-page) body {
   --offset: calc(-1 * var(--pf-global--spacer--sm));
   margin-top: var(--offset);
   margin-bottom: var(--offset);
-}
-
-// Drop side padding in mobile mode,
-// intended mainly for PF PageSection elements (pf-c-page__main-section).
-// It's similar to adding padding={{ default: 'noPadding', sm: 'padding' }},
-// except this only affects the sides, not the top and bottom.
-@media screen and (max-width: $pf-global--breakpoint--sm) {
-  .ct-pagesection-mobile {
-    padding-left: 0;
-    padding-right: 0;
-  }
 }

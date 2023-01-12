@@ -18,10 +18,11 @@
  */
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import 'polyfills'; // once per application
+import 'cockpit-dark-theme'; // once per page
 
 import cockpit from "cockpit";
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from 'react-dom/client';
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
@@ -33,8 +34,6 @@ import { Overview } from "./overview.jsx";
 import { Details } from "./details.jsx";
 import { update_plot_state } from "./plot.jsx";
 
-import "table.css";
-import "journal.css";
 import "./storage.scss";
 
 const _ = cockpit.gettext;
@@ -96,7 +95,8 @@ class StoragePage extends React.Component {
 }
 
 function init() {
-    ReactDOM.render(<StoragePage client={client} />, document.getElementById("storage"));
+    const root = createRoot(document.getElementById('storage'));
+    root.render(<StoragePage client={client} />);
     document.body.removeAttribute("hidden");
 
     window.addEventListener('beforeunload', event => {

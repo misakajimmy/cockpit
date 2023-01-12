@@ -20,119 +20,88 @@ import logging
 import os
 import pwd
 
+from typing import Optional
+
 from systemd_ctypes import bus
 
 logger = logging.getLogger(__name__)
 
 
-class ConfigEndpoint(bus.Object):
+class cockpit_Config(bus.Object):
     def __init__(self):
         ...
 
-    @bus.Object.method(out_types='u', in_types='suuu')
+    @bus.Interface.Method(out_types='u', in_types='suuu')
     def get_u_int(self, name, _minimum, default, _maximum):
         return default
 
 
-@bus.Object.interface('cockpit.LoginMessages')
-class LoginMessagesEndpoint(bus.Object):
-    ...
+class cockpit_LoginMessages(bus.Object):
+    messages: Optional[str] = None
+
+    def __init__(self):
+        fdstr = os.environ.pop('COCKPIT_LOGIN_MESSAGES_MEMFD', None)
+        if fdstr is None:
+            logger.debug("COCKPIT_LOGIN_MESSAGES_MEMFD wasn't set.  No login messages today.")
+            return
+
+        logger.debug("Trying to read login messages from fd %s", fdstr)
+        try:
+            with open(int(fdstr), 'r') as login_messages:
+                login_messages.seek(0)
+                self.messages = login_messages.read()
+        except (ValueError, OSError, UnicodeDecodeError) as exc:
+            # ValueError - the envvar wasn't an int
+            # OSError - the fd wasn't open, or other read failure
+            # UnicodeDecodeError - didn't contain utf-8
+            # For all of these, we simply failed to get the message.
+            logger.debug("Reading login messages failed: %s", exc)
+        else:
+            logger.debug("Successfully read login messages: %s", self.messages)
+
+    @bus.Interface.Method(out_types=['s'])
+    def get(self):
+        return self.messages or '{}'
+
+    @bus.Interface.Method(out_types=[])
+    def dismiss(self):
+        self.messages = None
 
 
-@bus.Object.interface('cockpit.Machines')
-class MachinesEndpoint(bus.Object):
-    @bus.Object.method(in_types=['s', 's', 'a{sv}'])
+class cockpit_Machines(bus.Object):
+    machines = bus.Interface.Property('a{sa{sv}}', value={})
+
+    @bus.Interface.Method(in_types=['s', 's', 'a{sv}'])
     def update(self, *args):
         ...
 
-    @bus.Object.property('a{sa{sv}}')
-    def machines(self):
-        return {}
 
-
-@bus.Object.interface('cockpit.Packages')
-class PackagesEndpoint(bus.Object):
+class cockpit_Packages(bus.Object):
     ...
 
 
-@bus.Object.interface('cockpit.Superuser')
-class SuperuserEndpoint(bus.Object):
-    @bus.Object.method(in_types=['s'])
-    def start(self, _bridge):
-        ...
+class cockpit_User(bus.Object):
+    name = bus.Interface.Property('s', value='')
+    full = bus.Interface.Property('s', value='')
+    id = bus.Interface.Property('i', value=0)
+    home = bus.Interface.Property('s', value='')
+    shell = bus.Interface.Property('s', value='')
+    groups = bus.Interface.Property('as', value=[])
 
-    @bus.Object.method()
-    def stop(self):
-        ...
-
-    @bus.Object.method(in_types=['s'])
-    def answer(self, reply):
-        ...
-
-    @bus.Object.property('as')
-    def bridges(self):
-        return ['sudo', 'pkexec']
-
-    @bus.Object.property('s')
-    def current(self):
-        return 'root'
-
-
-@bus.Object.interface('cockpit.User')
-class UserEndpoint(bus.Object):
     def __init__(self):
-        self.pwd = pwd.getpwuid(os.getuid())
-
-    @bus.Object.property('s', 'Name')
-    def name(self):
-        return self.pwd.pw_name
-
-    @bus.Object.property('s', 'Full')
-    def full(self):
-        return self.pwd.pw_gecos
-
-    @bus.Object.property('i', 'Id')
-    def id(self):
-        return self.pwd.pw_uid
-
-    @bus.Object.property('s', 'Home')
-    def home(self):
-        return self.pwd.pw_dir
-
-    @bus.Object.property('s', 'Shell')
-    def shell(self):
-        return self.pwd.pw_shell
-
-    @bus.Object.property('as', 'Groups')
-    def groups(self):
-        return [gr.gr_name for gr in grp.getgrall() if self.pwd.pw_name in gr.gr_mem]
+        user = pwd.getpwuid(os.getuid())
+        self.name = user.pw_name
+        self.full = user.pw_gecos
+        self.id = user.pw_uid
+        self.home = user.pw_dir
+        self.shell = user.pw_shell
+        self.groups = [gr.gr_name for gr in grp.getgrall() if user.pw_name in gr.gr_mem]
 
 
-class InternalEndpoints:
-    server = None
-    client = None
-    slots = None
-
-    @classmethod
-    def create(cls):
-        cls.client, cls.server = bus.Bus.socketpair(attach_event=True)
-        cls.slots = [
-            cls.server.add_object('/LoginMessages', LoginMessagesEndpoint()),
-            cls.server.add_object('/config', ConfigEndpoint()),
-            cls.server.add_object('/machines', MachinesEndpoint()),
-            cls.server.add_object('/packages', PackagesEndpoint()),
-            cls.server.add_object('/superuser', SuperuserEndpoint()),
-            cls.server.add_object('/user', UserEndpoint()),
-        ]
-
-    @classmethod
-    def get_client(cls):
-        if cls.client is None:
-            cls.create()
-        return cls.client
-
-    @classmethod
-    def get_server(cls):
-        if cls.server is None:
-            cls.create()
-        return cls.server
+EXPORTS = [
+    ('/LoginMessages', cockpit_LoginMessages),
+    ('/config', cockpit_Config),
+    ('/machines', cockpit_Machines),
+    ('/packages', cockpit_Packages),
+    ('/user', cockpit_User),
+]

@@ -19,7 +19,7 @@
 
 import cockpit from "cockpit";
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 
 import { TimeoutModal } from "./shell-modals.jsx";
 
@@ -37,7 +37,7 @@ function Frames(index, setupIdleResetTimers) {
     const self = this;
     let language = document.cookie.replace(/(?:(?:^|.*;\s*)CockpitLang\s*=\s*([^;]*).*$)|^.*$/, "$1");
     if (!language)
-        language = "en-us";
+        language = navigator.language.toLowerCase(); // Default to Accept-Language header
 
     /* Lists of frames, by host */
     self.iframes = { };
@@ -93,8 +93,11 @@ function Frames(index, setupIdleResetTimers) {
             if (frame.contentWindow && setupIdleResetTimers)
                 setupIdleResetTimers(frame.contentWindow);
 
-            if (frame.contentDocument && frame.contentDocument.documentElement)
+            if (frame.contentDocument && frame.contentDocument.documentElement) {
                 frame.contentDocument.documentElement.lang = language;
+                if (cockpit.language_direction)
+                    frame.contentDocument.documentElement.dir = cockpit.language_direction;
+            }
         } else {
             frame.timer = window.setTimeout(function() {
                 frame_ready(frame, count + 1);
@@ -205,6 +208,25 @@ function Frames(index, setupIdleResetTimers) {
         if (new_frame) {
             list[component] = frame;
             document.getElementById("content").appendChild(frame);
+
+            const style = localStorage.getItem('shell:style') || 'auto';
+            let dark_mode;
+            // If a user set's an explicit theme, ignore system changes.
+            if ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && style === "auto") || style === "dark") {
+                dark_mode = true;
+            } else {
+                dark_mode = false;
+            }
+
+            // The new iframe is shown before any HTML/CSS is ready and loaded,
+            // explicitly set a dark background so we don't see any white flashes
+            if (dark_mode && frame.contentDocument && frame.contentDocument.documentElement) {
+                // --pf-global--BackgroundColor--dark-300
+                const dark_mode_background = '#1b1d21';
+                frame.contentDocument.documentElement.style.background = dark_mode_background;
+            } else {
+                frame.contentDocument.documentElement.style.background = 'white';
+            }
         }
         frame_ready(frame);
         return frame;
@@ -424,7 +446,9 @@ function Router(index) {
                 if (source) {
                     const reply = {
                         ...cockpit.transport.options,
-                        command: "init", host: source.default_host, "channel-seed": source.channel_seed,
+                        command: "init",
+                        host: source.default_host,
+                        "channel-seed": source.channel_seed,
                     };
                     child.postMessage("\n" + JSON.stringify(reply), origin);
                     source.inited = true;
@@ -527,22 +551,26 @@ function Index() {
         }
     }
 
+    let session_timeout_dialog_root = null;
+
     function updateFinalCountdown() {
         const remaining_secs = Math.floor(final_countdown / 1000);
         const timeout_text = cockpit.format(_("You will be logged out in $0 seconds."), remaining_secs);
         document.title = "(" + remaining_secs + ") " + title;
-        ReactDOM.render(React.createElement(TimeoutModal, {
+        if (!session_timeout_dialog_root)
+            session_timeout_dialog_root = createRoot(document.getElementById('session-timeout-dialog'));
+        session_timeout_dialog_root.render(React.createElement(TimeoutModal, {
             onClose: () => {
                 window.clearTimeout(session_final_timer);
                 session_final_timer = null;
                 document.title = title;
                 resetTimer();
-                ReactDOM.unmountComponentAtNode(document.getElementById('session-timeout-dialog'));
+                session_timeout_dialog_root.unmount();
+                session_timeout_dialog_root = null;
                 final_countdown = 30000;
             },
             text: timeout_text,
-        }),
-                        document.getElementById('session-timeout-dialog'));
+        }));
     }
 
     function sessionFinalTimeout() {

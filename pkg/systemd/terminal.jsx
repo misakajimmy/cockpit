@@ -1,8 +1,9 @@
 import cockpit from "cockpit";
+import 'cockpit-dark-theme'; // once per page
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import {
     FormSelect, FormSelectOption, NumberInput,
     Toolbar, ToolbarContent, ToolbarItem, ToolbarGroup
@@ -174,7 +175,8 @@ const _ = cockpit.gettext;
     }
     UserTerminal.displayName = "UserTerminal";
 
-    ReactDOM.render(<UserTerminal />, document.getElementById('terminal'));
+    const root = createRoot(document.getElementById('terminal'));
+    root.render(<UserTerminal />);
 
     /* And show the body */
     document.body.removeAttribute("hidden");

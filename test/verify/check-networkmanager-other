@@ -19,12 +19,12 @@
 
 import parent  # noqa: F401
 from netlib import NetworkCase
-from testlib import nondestructive, skipDistroPackage, skipImage, test_main, wait
+from testlib import nondestructive, skipDistroPackage, todoPybridge, test_main, wait
 
 
 @skipDistroPackage()
-@skipImage("TODO: networkmanager fails on Arch Linux", "arch")
 @nondestructive
+@todoPybridge()
 class TestNetworkingOther(NetworkCase):
     def testOther(self):
         b = self.browser
@@ -34,6 +34,7 @@ class TestNetworkingOther(NetworkCase):
 
         # Create a tun device and let NetworkManager manage it
         m.execute(f"ip tuntap add mode tun dev {iface}")
+        self.addCleanup(m.execute, f"ip link del dev {iface}")
         wait(lambda: m.execute(f'nmcli device | grep {iface} | grep -v unavailable'))
         m.execute(f"nmcli dev set {iface} managed yes")
 

@@ -108,11 +108,11 @@ class MDRaidSidebar extends React.Component {
 
             function state_text(state) {
                 return {
-                    faulty:       _("Failed"),
-                    in_sync:      _("In sync"),
-                    spare:        active_state[1] < 0 ? _("Spare") : _("Recovering"),
+                    faulty: _("Failed"),
+                    in_sync: _("In sync"),
+                    spare: active_state[1] < 0 ? _("Spare") : _("Recovering"),
                     write_mostly: _("Write-mostly"),
-                    blocked:      _("Blocked")
+                    blocked: _("Blocked")
                 }[state] || cockpit.format(_("Unknown ($0)"), state);
             }
 
@@ -264,7 +264,7 @@ export class MDRaidDetails extends React.Component {
 
             function delete_() {
                 if (mdraid.Delete)
-                    return mdraid.Delete({ 'tear-down': { t: 'b', v: true } });
+                    return mdraid.Delete({ 'tear-down': { t: 'b', v: true } }).then(utils.reload_systemd);
 
                 // If we don't have a Delete method, we simulate
                 // it by stopping the array and wiping all

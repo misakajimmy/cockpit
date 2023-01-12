@@ -44,12 +44,13 @@ import "./timers.scss";
 
 const _ = cockpit.gettext;
 
-export const CreateTimerDialog = ({ owner }) => {
+export const CreateTimerDialog = ({ owner, isLoading }) => {
     const Dialogs = useDialogs();
     return (
         <Button key='create-timer-action'
                 variant="secondary"
                 id="create-timer"
+                isDisabled={isLoading}
                 onClick={() => {
                     updateTime();
                     Dialogs.show(<CreateTimerDialogBody owner={owner} />);
@@ -140,7 +141,6 @@ const CreateTimerDialogBody = ({ owner }) => {
            title={cockpit.format(_("Create timer"), name)}
            footer={
                <>
-                   {dialogError && <ModalError dialogError={_("Timer creation failed")} dialogErrorDetail={dialogError} />}
                    <Button variant='primary'
                            id="timer-save-button"
                            isLoading={inProgress}
@@ -153,6 +153,7 @@ const CreateTimerDialogBody = ({ owner }) => {
                    </Button>
                </>
            }>
+            {dialogError && <ModalError dialogError={_("Timer creation failed")} dialogErrorDetail={dialogError} />}
             <Form isHorizontal onSubmit={onSubmit}>
                 <FormGroup label={_("Name")}
                            fieldId="servicename"
@@ -335,7 +336,8 @@ const CreateTimerDialogBody = ({ owner }) => {
                                                             const arr = [...repeatPatterns];
                                                             arr[idx].date = str;
                                                             setRepeatPatterns(arr);
-                                                        }} />
+                                                        }}
+                                                        appendTo={() => document.body} />
                                             {timePicker(idx)}
                                         </>}
                                         {repeat !== "no" && <FlexItem align={{ default: 'alignRight' }}>

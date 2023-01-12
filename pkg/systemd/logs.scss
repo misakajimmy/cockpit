@@ -98,6 +98,12 @@
   }
 }
 
+.pf-theme-dark {
+  #journal-box .panel-heading {
+    color: var(--pf-global--Color--400);
+  }
+}
+
 /* Set min width for services in the journal view */
 #journal .cockpit-logline {
   --log-service-min: 8rem;

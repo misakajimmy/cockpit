@@ -3,7 +3,8 @@ import QUnit from "qunit-tests";
 
 const pig_latin = {
     "": {
-        language: "pig", "plural-forms": function(n) {
+        language: "pig",
+        "plural-forms": function(n) {
             const plural = (n != 1);
             return plural;
         }
@@ -26,7 +27,8 @@ const pig_latin = {
 
 const ru = {
     "": {
-        language: "ru", "plural-forms":
+        language: "ru",
+        "plural-forms":
         function(n) {
             const plural = (n % 10 == 1 && n % 100 != 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2);
             return plural;
@@ -216,7 +218,7 @@ QUnit.test("translate attributes", function (assert) {
     assert.equal(syntax.hasAttribute("translate"), false, "translate removed");
 });
 
-document.addEventListener("DOMContentLoaded", event => {
+function init() {
     /* Area for translate tests to play in */
     const div = document.createElement('div');
     div.setAttribute('id', 'translations');
@@ -225,4 +227,9 @@ document.addEventListener("DOMContentLoaded", event => {
 
     /* Ready to go */
     QUnit.start();
-});
+}
+
+if (document.readyState == "loading")
+    document.addEventListener("DOMContentLoaded", init);
+else
+    init();

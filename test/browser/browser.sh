@@ -2,6 +2,9 @@
 # This script is meant to be run on an ephemeral CI host, for packit/Fedora/RHEL gating.
 set -eux
 
+# like "basic", passed on to run-test.sh
+PLAN="$1"
+
 MYDIR="$(realpath $(dirname "$0"))"
 if [ -d source ]; then
     # path for standard-test-source
@@ -34,8 +37,15 @@ if grep -q 'ID=.*fedora' /etc/os-release; then
     dnf install -y tcsh
 fi
 
-# HACK: sosreport needs magic - https://bugzilla.redhat.com/show_bug.cgi?id=2120953
-dnf install -y python3-magic
+if grep -q 'ID=.*rhel' /etc/os-release; then
+    # required by TestUpdates.testKpatch, but kpatch is only in RHEL
+    dnf install -y kpatch kpatch-dnf
+fi
+
+# On CentOS Stream 8 the cockpit package is upgraded so the file isn't touched.
+if [ ! -f /etc/cockpit/disallowed-users ]; then
+    echo 'root' > /etc/cockpit/disallowed-users
+fi
 
 #HACK: unbreak RHEL 9's default choice of 999999999 rounds, see https://bugzilla.redhat.com/show_bug.cgi?id=1993919
 sed -ie 's/#SHA_CRYPT_MAX_ROUNDS 5000/SHA_CRYPT_MAX_ROUNDS 5000/' /etc/login.defs
@@ -71,7 +81,7 @@ firewall-cmd --add-service=cockpit --permanent
 firewall-cmd --add-service=cockpit
 
 # Run tests as unprivileged user
-su - -c "env TEST_BROWSER=firefox SOURCE=$SOURCE LOGS=$LOGS $MYDIR/run-test.sh" runtest
+su - -c "env TEST_BROWSER=firefox SOURCE=$SOURCE LOGS=$LOGS $MYDIR/run-test.sh $PLAN" runtest
 
 RC=$(cat $LOGS/exitcode)
 exit ${RC:-1}

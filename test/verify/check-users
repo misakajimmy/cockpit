@@ -20,13 +20,14 @@
 import datetime
 
 import parent  # noqa: F401
-from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, test_main
+from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main, wait
 
 
 @nondestructive
 @skipDistroPackage()
 class TestAccounts(MachineCase):
 
+    @todoPybridge(flaky=True)
     def testBasic(self):
         b = self.browser
         m = self.machine
@@ -40,11 +41,11 @@ class TestAccounts(MachineCase):
             b.wait_in_text('#accounts-list', "anton")
 
         # There is only one badge and it is for admin
-        b.wait_text('.cockpit-account-badge', 'Your account')
-        b.wait_js_cond('document.querySelector(".cockpit-account-badge").previousSibling.getAttribute("href") === "#/admin"')
+        b.wait_text('#current-account-badge', 'Your account')
+        b.wait_js_cond('document.querySelector("#current-account-badge").previousSibling.getAttribute("href") === "#/admin"')
 
         # The current account is the first in the list
-        b.wait_visible(".pf-c-card:first-child .cockpit-account-badge")
+        b.wait_visible("#accounts-list > tbody :first-child #current-account-badge")
 
         # Set a real name
         b.go("#/anton")
@@ -65,7 +66,7 @@ class TestAccounts(MachineCase):
         b.wait_text("#account-title", "Anton Arbitrary")
         # On the overview page it also shows only real name
         b.go("/users")
-        b.wait_text('.cockpit-account-real-name:contains("Anton")', "Anton Arbitrary")
+        b.wait_text('#accounts-list td[data-label="Full name"]:contains("Anton")', "Anton Arbitrary")
         b.go("/users/#anton")
 
         good_password = "tqymuVh.ZfZnP§9Wr=LM3JyG5yx"
@@ -77,17 +78,24 @@ class TestAccounts(MachineCase):
         b.wait_visible("#accounts")
         b.wait_not_in_text('#accounts-list', "Anton Arbitrary")
 
+        # Attempt a real name with a colon
+        b.click('#accounts-create')
+        b.wait_visible('#accounts-create-dialog')
+        b.set_input_text('#accounts-create-real-name', "Col:n Colon")  # This should fail
+        b.set_input_text('#accounts-create-password-pw1', good_password)
+        b.set_input_text('#accounts-create-password-pw2', good_password)
+        b.click('#accounts-create-dialog button.apply')
+        b.wait_in_text("#accounts-create-dialog .pf-c-form__helper-text.pf-m-error", "The full name must not contain colons.")
+        b.click('#accounts-create-dialog button.cancel')
+        b.wait_visible("#accounts")
+
         # Check root user
         b.go("#/root")
         b.wait_text("#account-user-name", "root")
         # some operations are not allowed for root user
         b.wait_visible("#account-delete[disabled]")
         b.wait_visible("#account-real-name[disabled]")
-        # when running against existing machines there might be an ssh root session
-        if "root" in m.execute("who"):
-            b.wait_visible("#account-logout:not([disabled])")
-        else:
-            b.wait_visible("#account-logout[disabled]")
+        b.wait_visible("#account-logout[disabled]")
         b.wait_visible("#account-locked:not(:checked)")
         # root account should not be locked by default on our images
         self.assertIn(m.execute("passwd -S root").split()[1], ["P", "PS"])
@@ -187,7 +195,7 @@ class TestAccounts(MachineCase):
         def is_admin():
             return "jussi" in m.execute(f"getent group {m.get_admin_group()}")
 
-        admin_role_sel = f'input[data-name="{m.get_admin_group()}"]'
+        admin_role_sel = '#account-groups-form-group'
         b.wait(lambda: "jussi" in m.execute("grep jussi /etc/passwd"))
         b.wait(lambda: not is_admin())
         b.wait(is_locked)
@@ -199,42 +207,44 @@ class TestAccounts(MachineCase):
         # Unlock it and make it an admin
         b.go("#/jussi")
         b.wait_text("#account-user-name", "jussi")
+        b.wait_visible("#account-locked:checked")
         b.set_checked('#account-locked', False)
         b.wait(lambda: not is_locked())
-        b.wait_visible(admin_role_sel + ":not(:checked)")
-        b.set_checked(admin_role_sel, True)
+        b.wait_not_present(admin_role_sel + f" .pf-c-label:contains(:{m.get_admin_group()})")
+        b.click("#account-groups")
+        b.click(admin_role_sel + f" li:contains({m.get_admin_group()}) > button")
         b.wait(is_admin)
-        b.wait_visible(admin_role_sel + ":checked")
-        b.wait_not_present("#account-roles .pf-c-alert.pf-m-info")
+        b.wait_not_present("#account-groups-helper")
 
         # Login as jussi and change role admin for itself
         b.logout()
         b.login_and_go("/users", user="jussi", password="bar")
 
         # There is only one badge and it is for jussi
-        b.wait_text('.cockpit-account-badge', 'Your account')
-        b.wait_js_cond('document.querySelector(".cockpit-account-badge").previousSibling.getAttribute("href") === "#/jussi"')
+        b.wait_text('#current-account-badge', 'Your account')
+        b.wait_js_cond('document.querySelector("#current-account-badge").previousSibling.getAttribute("href") === "#/jussi"')
 
         # The current account is the first in the list
-        b.wait_visible(".pf-c-card:first-child .cockpit-account-badge")
+        b.wait_visible("#accounts-list > tbody :first-child #current-account-badge")
 
         b.go("#/jussi")
         b.wait_text("#account-user-name", "jussi")
-        b.wait_visible(admin_role_sel + ":checked")
-        b.set_checked(admin_role_sel, False)
+        b.wait_visible(admin_role_sel + f" .pf-c-label:contains({m.get_admin_group()})")
+        b.wait_not_present("#account-groups-helper")
+        b.click(f".pf-c-label-group__list .pf-c-label__content:contains({m.get_admin_group()}) + button[aria-label='Close {m.get_admin_group()}']")
         b.wait(lambda: not is_admin())
         if m.image != "fedora-coreos":  # User is not shown as logged in when logged in through Cockpit
-            b.wait_visible("#account-roles .pf-c-alert.pf-m-info")
-        m.execute(f"/usr/sbin/usermod jussi -G {m.get_admin_group()} -a")
-        b.wait_visible(admin_role_sel + ":checked:not([disabled])")
+            b.wait_visible("#account-groups-helper")
+        m.execute(f"/usr/bin/gpasswd -a jussi {m.get_admin_group()}")
+        b.wait_visible(admin_role_sel + f" .pf-c-label:contains({m.get_admin_group()})")
 
         # Cannot lock the current account
         b.wait_visible("#account-locked[disabled]")
 
         b.go("#/admin")
         b.wait_text("#account-user-name", "admin")
-        b.wait_visible(admin_role_sel + ":checked")
-        b.wait_not_present("#account-roles .pf-c-alert.pf-m-info")
+        b.wait_visible(admin_role_sel + f" .pf-c-label:contains({m.get_admin_group()})")
+        b.wait_not_present("#account-groups-helper")
         b.logout()
         b.login_and_go("/users")
 
@@ -285,7 +295,7 @@ class TestAccounts(MachineCase):
         b.go("/users")
         b.enter_page("/users")
         b.wait_in_text('#accounts-list', "damaged")
-        b.click('.cockpit-account-user-name a[href="#/damaged"]')
+        b.click('#accounts-list td[data-label="Username"] a[href="#/damaged"]')
         b.wait_in_text("#account-title", "Damaged")
 
         if m.image != "fedora-coreos":  # User is not shown as logged in when logged in through Cockpit
@@ -328,9 +338,13 @@ class TestAccounts(MachineCase):
 
         b.wait_not_present('#accounts-create-dialog')
         b.wait_in_text('#accounts-list', "Robert Robertson")
-
         # Login as robert and check if password change is required
         b.logout()
+
+        # login in second window to check if last login is updated in accounts list
+        if m.image != "fedora-coreos":  # User is not shown as logged in when logged in through Cockpit
+            b2.login_and_go("/users")
+            b2.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Last active']", "Never logged in")
 
         # On OSTree this happens over ssh
         if m.ostree_image:
@@ -356,10 +370,121 @@ class TestAccounts(MachineCase):
         b.click('#login-button')
         b.wait_visible('#content')
 
+        def performUserAction(browser, user, action):
+            browser.click(f"#accounts-list tbody tr:contains({user}) .pf-c-dropdown button")
+            browser.click(f"#accounts-list tbody tr:contains({user}) .pf-c-dropdown__menu li:contains({action})")
+
+        if m.image != "fedora-coreos":
+            b2.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Last active']", "Logged in")
+            performUserAction(b2, 'robert', 'Log user out')
+            b2.click("#account-confirm-logout-dialog footer .pf-c-button.apply")
+
+            (year, month) = m.execute("date +'%Y %b'").strip().split()
+            b2.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Last active']", year)
+            b2.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Last active']", month)
+
+        b.logout()
+        b.login_and_go("/users")
+        # Test actions in kebab menu
+        # disable password
+        performUserAction(b, 'robert', 'Lock account')
+        b.click("#account-confirm-lock-dialog footer .pf-m-danger.apply")
+        # lock option is now disabled
+        b.click("#accounts-list tbody tr:contains(robert) .pf-c-dropdown button")
+        b.wait_in_text("#accounts-list tbody tr:contains(robert) .pf-c-dropdown__menu li:contains('Lock account') .pf-m-disabled", 'Lock account')
+        b.click("#accounts-list tbody tr:contains(robert) .pf-c-dropdown button")
+        # change is visible on details page
+        performUserAction(b, 'robert', 'Edit user')
+        b.wait_in_text('#account-title', 'Robert Robertson')
+        b.wait_visible('#account-locked:checked')
+        b.click("#account-locked")
+        b.go('/users')
+
+        # Check Robert's groups
+        b.wait_not_present("#accounts-list tbody tr:contains(robert) td[data-label='Group'] .pf-c-label:contains(users)")
+        if m.image != "fedora-coreos":  # Users group does not exist in coreos image
+            m.execute("/usr/bin/gpasswd -a robert users")
+            b.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Group'] .pf-c-label.pf-m-cyan:contains(users)", "users")
+        m.execute(f"/usr/bin/gpasswd -a robert {m.get_admin_group()}")
+        b.wait_in_text("#accounts-list tbody tr:contains(robert) td[data-label='Group'] .pf-c-label.pf-m-gold", m.get_admin_group())
+        m.execute(f"/usr/bin/gpasswd -d robert {m.get_admin_group()}")
+        b.wait_not_present("#accounts-list tbody tr:contains(robert) td[data-label='Group'] .pf-c-label.pf-m-gold")
+
+        # test filters
+        b.set_input_text("#accounts-filter input", "rOBeRt")
+        b.wait_in_text("#accounts-list tbody tr:first-child td[data-label='Username']", "robert")
+        b.set_input_text("#accounts-filter input", "root")
+        b.wait_in_text("#accounts-list tbody tr:first-child td[data-label='Username']", "root")
+
+        uid = "1000"
+        if "debian" in m.image or "ubuntu" in m.image:
+            uid = "1001"
+        b.set_input_text("#accounts-filter input", uid)
+        b.wait_in_text("#accounts-list tbody tr:first-child td[data-label='ID']", uid)
+        b.set_input_text("#accounts-filter input", "spooky")
+        b.wait_visible("#accounts div.pf-c-empty-state")
+
+        b.inject_js("""
+                    function getTextColumn(query_selector) {
+                        const values = [];
+                        document.querySelectorAll(query_selector).forEach(node => values.push(node.innerText));
+                        return values;
+                    }""")
+
+        def check_column_sort(query_selector, invert=False):
+            # current account is always in the first row
+            b.wait_in_text("#accounts-list tbody tr:first-child td[data-label='Username']", "admin")
+            values = b.eval_js(f"getTextColumn(\"{query_selector}\")")
+            for i in range(2, len(values)):
+                if values[i].isnumeric():
+                    value_current = int(values[i])
+                    value_prev = int(values[i - 1])
+                else:
+                    value_current = values[i].lower()
+                    value_prev = values[i - 1].lower()
+
+                if (invert):
+                    b.wait(lambda: value_prev > value_current)
+                else:
+                    b.wait(lambda: value_prev < value_current)
+
+        # robert should be in users group
+        if m.image != "fedora-coreos":  # Users group does not exist in coreos image
+            b.set_input_text("#accounts-filter input", "users")
+            names = b.eval_js("getTextColumn(\"[data-label='Username'] a\")")
+            b.wait(lambda: "robert" in names)
+
+        # clear text filters
+        b.click("#accounts-filter button[aria-label='Reset']")
+
+        # check alphabetical order of Username
+        check_column_sort("[data-label='Username'] a")
+        b.click("#accounts-list > thead > tr > th:nth-child(1) > button")
+        check_column_sort("[data-label='Username'] a", invert=True)
+
+        # sort by full name
+        b.click("#accounts-list > thead > tr > th:nth-child(2) > button")
+        check_column_sort("[data-label='Full name']")
+        b.click("#accounts-list > thead > tr > th:nth-child(2) > button")
+        check_column_sort("[data-label='Full name']", invert=True)
+
+        # sort by ID
+        b.click("#accounts-list > thead > tr > th:nth-child(3) > button")
+        check_column_sort("[data-label='ID']", invert=True)
+        b.click("#accounts-list > thead > tr > th:nth-child(3) > button")
+        check_column_sort("[data-label='ID']")
+
+        # In fedora-core userdel for this user consistently fails
+        # userdel: user robert is currently used by process *
+        if m.image != "fedora-coreos":
+            performUserAction(b, 'robert', 'Delete account')
+            b.click("#account-confirm-delete-dialog footer button.pf-m-danger.apply")
+            b.wait_not_in_text('#accounts-list', "Robert Robertson")
+
         self.allow_journal_messages("Password quality check failed:")
         self.allow_journal_messages("The password is a palindrome")
         self.allow_journal_messages("passwd: user.*does not exist")
-        self.allow_journal_messages("passwd: Unknown user name 'anton'.")
+        self.allow_journal_messages("passwd: Unknown user name '.*'.")
         self.allow_journal_messages("lastlog: Unknown user or range: anton")
         self.allow_journal_messages(".*required to change your password immediately.*")
         self.allow_journal_messages(".*user account or password has expired.*")
@@ -406,7 +531,7 @@ class TestAccounts(MachineCase):
         b.set_input_text("#account-set-password-pw1", new_password_2)
         b.set_input_text("#account-set-password-pw2", new_password_2)
         b.click('#account-set-password-dialog button.apply')
-        b.wait_in_text("#account-set-password-dialog .pf-c-modal-box__footer", "must wait longer")
+        b.wait_in_text("#account-set-password-dialog .pf-c-modal-box__body", "must wait longer")
 
     @skipImage("ssh root login not allowed", "fedora-coreos")
     def testRootLogin(self):
@@ -418,6 +543,7 @@ class TestAccounts(MachineCase):
         self.disable_preload("packagekit", "playground", "systemd")
 
         m.execute("useradd anton; echo anton:foobar | chpasswd")
+        self.enable_root_login()
         self.login_and_go("/users", user="root", superuser=False)
 
         # test this on root and a normal user account
@@ -566,6 +692,98 @@ class TestAccounts(MachineCase):
         b.wait_visible("#account-logs")
         # Header + one line of logins
         b.wait_js_func("ph_count_check", "#account-logs tr", 2)
+
+    def testGroups(self):
+        b = self.browser
+        m = self.machine
+
+        def performGroupAction(browser, group, action):
+            browser.click(f"#groups-list tbody tr:contains({group}) .pf-c-dropdown button")
+            browser.click(f"#groups-list tbody tr:contains({group}) .pf-c-dropdown__menu li:contains({action})")
+
+        def selectGroupFromMenu(group, enabled):
+            if enabled:
+                wait(lambda: "testgroup0" not in m.execute("groups admin"))
+            else:
+                wait(lambda: "testgroup0" in m.execute("groups admin"))
+
+            b.click("#account-groups")
+            b.click(f".pf-c-select__menu li:contains({group}) button")
+            if enabled:
+                b.wait_in_text(".pf-c-label-group__list", group)
+                b.wait_not_present(f".pf-c-select__menu li:contains({group}) button")
+                wait(lambda: "testgroup0" in m.execute("groups admin"))
+            else:
+                b.wait_not_in_text(".pf-c-label-group__list", group)
+                b.wait_not_present(f".pf-c-select__menu li:contains({group}) button")
+                wait(lambda: "testgroup0" not in m.execute("groups admin"))
+
+        m.execute("groupadd testgroup0")
+        m.execute("useradd anton")
+
+        self.login_and_go("/users")
+
+        b.click("#groups-view-toggle")
+        b.wait_visible('#groups-list td[data-label="Group name"]:contains("testgroup0")')
+
+        # Delete it
+        performGroupAction(b, 'testgroup0', 'Delete group')
+        b.wait_text("#group-confirm-delete-dialog footer .pf-c-button.apply", "Delete")
+        b.click("#group-confirm-delete-dialog footer .pf-c-button.apply")
+        b.wait_not_present('#account-confirm-delete-dialog')
+        b.wait_visible("#groups-list")
+        b.wait_not_in_text('#groups-list', "testgroup0")
+
+        # Add testgroup0 back
+        m.execute("groupadd testgroup0")
+
+        # Groups used as primary need force deletion
+        performGroupAction(b, 'anton', 'Delete group')
+        b.wait_text("#group-confirm-delete-dialog footer .pf-c-button.apply", "Force delete")
+        b.click("#group-confirm-delete-dialog footer .pf-c-button.apply")
+        b.wait_not_present('#account-confirm-delete-dialog')
+        b.wait_visible("#groups-list")
+        b.wait_not_in_text('#groups-list', "anton")
+
+        b.go("#/admin")
+
+        # Existing groups appear in labels
+        b.wait_in_text(".pf-c-label-group__list", "admin")
+        b.wait_in_text(".pf-c-label-group__list", m.get_admin_group())
+
+        # Primary group cannot be remove but others have a remove button
+        b.wait_visible(".pf-c-label-group__list .pf-c-label__content:contains(admin)")
+        b.wait_not_present(".pf-c-label-group__list .pf-c-label__content:contains(admin) + button")
+        b.wait_visible(f".pf-c-label-group__list .pf-c-label__content:contains({m.get_admin_group()}) + button[aria-label='Close {m.get_admin_group()}']")
+
+        # Clicking on the close button removes the group
+        b.click(f".pf-c-label-group__list .pf-c-label__content:contains({m.get_admin_group()}) + button[aria-label='Close {m.get_admin_group()}']")
+        b.wait_not_present(f".pf-c-label-group__list .pf-c-label__content:contains({m.get_admin_group()})")
+        b.wait_not_present(".pf-c-select__menu")
+
+        # Add admin to the testgroup0 group
+        selectGroupFromMenu("testgroup0", True)
+
+        # Check that changes ar persistent after reload
+        b.reload()
+        b.enter_page("/users")
+        b.wait_in_text(".pf-c-label-group__list", "testgroup0")
+
+        # Clicking on a used groups in the menu will remove it
+        selectGroupFromMenu("testgroup0", False)
+
+        # Clicking on the undo button will add the removed group back
+        b.click("#group-undo-btn")
+        b.wait_in_text(".pf-c-label-group__list", "testgroup0")
+        m.execute("/usr/bin/gpasswd -d admin testgroup0")
+
+        # Clicking on the undo button will remove the added group back
+        b.reload()
+        b.enter_page("/users")
+        selectGroupFromMenu("testgroup0", True)
+        b.click("#group-undo-btn")
+        b.wait_not_in_text(".pf-c-label-group__list", "testgroup0")
+        wait(lambda: "testgroup0" not in m.execute("groups admin"))
 
 
 if __name__ == '__main__':

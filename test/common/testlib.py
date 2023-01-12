@@ -75,6 +75,8 @@ __all__ = (
     'skipMobile',
     'skipBrowser',
     'skipPackage',
+    'todo',
+    'todoPybridge',
     'enableAxe',
     'timeout',
     'Error',
@@ -124,19 +126,28 @@ opts.coverage = False
 default_layouts = [
     {
         "name": "desktop",
+        "theme": "light",
         "shell_size": [1920, 1200],
         "content_size": [1680, 1130]
     },
     {
         "name": "medium",
+        "theme": "light",
         "is_mobile": False,
         "shell_size": [1280, 768],
         "content_size": [1040, 698]
     },
     {
         "name": "mobile",
+        "theme": "light",
         "shell_size": [414, 1920],
         "content_size": [414, 1856]
+    },
+    {
+        "name": "dark",
+        "theme": "dark",
+        "shell_size": [1920, 1200],
+        "content_size": [1680, 1130]
     }
 ]
 
@@ -187,7 +198,12 @@ class Browser:
             with open(f'{TEST_DIR}/browser-layouts.json') as fp:
                 self.layouts = json.load(fp)
         except FileNotFoundError:
-            self.layouts = default_layouts
+            # Firefox CDP does not support setting EmulatedMedia
+            # https://bugzilla.mozilla.org/show_bug.cgi?id=1549434
+            if self.cdp.browser.name == "chromium":
+                self.layouts = default_layouts
+            else:
+                self.layouts = [layout for layout in default_layouts if layout["name"] != "dark"]
         self.current_layout = None
 
     def title(self):
@@ -323,8 +339,6 @@ class Browser:
         return None
 
     def go(self, hash: str, host: str = "localhost"):
-        # if not hash.startswith("/@"):
-        #    hash = "/@" + host + hash
         self.call_js_func('ph_go', hash)
 
     def mouse(self, selector: str, type: str, x: int = 0, y: int = 0, btn: int = 0, ctrlKey: bool = False, shiftKey: bool = False, altKey: bool = False, metaKey: bool = False):
@@ -555,15 +569,21 @@ class Browser:
 
     def wait_js_cond(self, cond: str, error_description: str = "null"):
         count = 0
+        timeout = self.cdp.timeout * self.timeout_factor
+        start = time.time()
         while True:
             count += 1
             try:
                 result = self.cdp.invoke("Runtime.evaluate",
-                                         expression="ph_wait_cond(() => %s, %i, %s)" % (cond, self.cdp.timeout * self.timeout_factor * 1000, error_description),
+                                         expression="ph_wait_cond(() => %s, %i, %s)" % (cond, timeout * 1000, error_description),
                                          silent=False, awaitPromise=True, trace="wait: " + cond)
                 if "exceptionDetails" in result:
                     trailer = "\n".join(self.cdp.get_js_log())
                     self.raise_cdp_exception("timeout\nwait_js_cond", cond, result["exceptionDetails"], trailer)
+                duration = time.time() - start
+                percent = int(duration / timeout * 100)
+                if percent >= 50:
+                    print(f"WARNING: Waiting for {cond} took {duration:.1f} seconds, which is {percent}% of the timeout.")
                 return
             except RuntimeError as e:
                 data = e.args[0]
@@ -847,7 +867,7 @@ class Browser:
             self.click("#toggle-menu")
 
     def layout_is_mobile(self):
-        return self.current_layout["shell_size"][0] < 420
+        return self.current_layout and self.current_layout["shell_size"][0] < 420
 
     def open_superuser_dialog(self):
         if self.layout_is_mobile():
@@ -948,6 +968,11 @@ class Browser:
                         width=width, height=height,
                         deviceScaleFactor=0, mobile=False)
 
+    def _set_emulated_media_theme(self, name: str):
+        # https://bugzilla.mozilla.org/show_bug.cgi?id=1549434
+        if self.cdp.browser.name == "chromium":
+            self.cdp.invoke("Emulation.setEmulatedMedia", features=[{'name': 'prefers-color-scheme', 'value': name}])
+
     def set_layout(self, name: str):
         layout = [lo for lo in self.layouts if lo["name"] == name][0]
         if layout != self.current_layout:
@@ -955,6 +980,7 @@ class Browser:
             size = layout["shell_size"]
             self._set_window_size(size[0], size[1])
             self._adjust_window_for_fixed_content_size()
+            self._set_emulated_media_theme(layout["theme"])
 
     def _adjust_window_for_fixed_content_size(self):
         if self.eval_js("window.name").startswith("cockpit1:"):
@@ -1259,19 +1285,19 @@ class MachineCase(unittest.TestCase):
     global_machine = None
 
     @classmethod
-    def get_global_machine(klass):
-        if klass.global_machine:
-            return klass.global_machine
-        klass.global_machine = klass.new_machine(klass, restrict=True, cleanup=False)
+    def get_global_machine(cls):
+        if cls.global_machine:
+            return cls.global_machine
+        cls.global_machine = cls.new_machine(cls, restrict=True, cleanup=False)
         if opts.trace:
-            print("Starting global machine {0}".format(klass.global_machine.label))
-        klass.global_machine.start()
-        return klass.global_machine
+            print("Starting global machine {0}".format(cls.global_machine.label))
+        cls.global_machine.start()
+        return cls.global_machine
 
     @classmethod
-    def kill_global_machine(klass):
-        if klass.global_machine:
-            klass.global_machine.kill()
+    def kill_global_machine(cls):
+        if cls.global_machine:
+            cls.global_machine.kill()
 
     def label(self):
         (unused, sep, label) = self.id().partition(".")
@@ -1321,6 +1347,9 @@ class MachineCase(unittest.TestCase):
             else:
                 if machine.image == reference_image:
                     pixels_label = self.label()
+        # HACK: until @todoPybridge disappears from all pixel tests
+        if os.environ.get("TEST_SCENARIO") == "pybridge":
+            pixels_label = None
         browser = Browser(machine.web_address,
                           label=label, pixels_label=pixels_label, coverage_label=self.label() if coverage else None,
                           port=machine.web_port, machine=self)
@@ -1352,7 +1381,7 @@ class MachineCase(unittest.TestCase):
     def disable_preload(self, *packages):
         for pkg in packages:
             path = "/usr/share/cockpit/%s" % pkg
-            if self.machine.execute("if test -e %s; then echo yes; fi" % path):
+            if self.file_exists(path):
                 if self.machine.ostree_image:
                     # get a writable directory
                     self.restore_dir(path)
@@ -1360,7 +1389,7 @@ class MachineCase(unittest.TestCase):
 
     def enable_preload(self, package, *pages):
         path = "/usr/share/cockpit/%s" % package
-        if self.machine.execute("if test -e %s; then echo yes; fi" % path):
+        if self.file_exists(path):
             self.write_file(path + '/override.json', '{ "preload": [%s]}' % ', '.join('"{0}"'.format(page) for page in pages))
 
     def system_before(self, version):
@@ -1567,7 +1596,9 @@ class MachineCase(unittest.TestCase):
                 self.check_pixel_tests()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def login_and_go(self, path=None, user=None, host=None, superuser=True, urlroot=None, tls=False):
+    def login_and_go(self, path=None, user=None, host=None, superuser=True, urlroot=None, tls=False, enable_root_login=False):
+        if enable_root_login:
+            self.enable_root_login()
         self.machine.start_cockpit(tls=tls)
         self.browser.login_and_go(path, user=user, host=host, superuser=superuser, urlroot=urlroot, tls=tls)
 
@@ -1731,6 +1762,90 @@ class MachineCase(unittest.TestCase):
             # can happen on shutdown when /run/systemd/coredump is gone already
             self.allowed_messages.append("Failed to connect to coredump service: No such file or directory")
             self.allowed_messages.append("Failed to connect to coredump service: Connection refused")
+
+        # HACK: pybridge bugs
+        if os.environ.get("TEST_SCENARIO") == "pybridge":
+            self.allowed_messages += [
+                "ERROR:asyncio:Task was destroyed but it is pending!",
+                "task:.*Task pending.*cockpit/channels/dbus.py.*"]
+
+            self.allowed_messages += [
+                r"Exception ignored on calling ctypes callback function: <function Slot.__init__.<locals>.handler.*",
+                r"asyncio.exceptions.InvalidStateError: invalid state",
+                r"ERROR:asyncio:Exception in callback _Transport._read_ready.*",
+                r"handle: <Handle _Transport._read_ready\(\)>",
+                r"Traceback \(most recent call last\):",
+                r"File .*asyncio/events.py.*",
+                r"self._context.run\(self._callback, \*self._args\)",
+                r"File .*cockpit/transports.py.* _read_ready",
+                r"data = os.read\(self._in_fd, _Transport.BLOCK_SIZE\)",
+                r"ConnectionResetError: \[Errno 104\] Connection reset by peer"]
+
+            self.allowed_messages += [
+                r"File .*/systemd_ctypes/bus.py.* in handler",
+                r"return 1 if callback.*BusMessage.ref.* else 0",
+                r"File .*/systemd_ctypes/bus.py.* in done",
+                r"future.set_result\(message\)"]
+
+            self.allowed_messages += [
+                r"ERROR:asyncio:Exception in callback BusMessage._coroutine_task_complete.*",
+                r"handle: .*Handle BusMessage._coroutine_task_complete.*",
+                r"File .*/systemd_ctypes/bus.py.* in _coroutine_task_complete",
+                r"self.reply_method_function_return_value.*",
+                r"File .*/cockpit/superuser.py.*",
+                r"await startup.wait.*",
+                r"await self.future",
+                r"File .*/cockpit/transports.py.*",
+                r"n_bytes = os.write\(self._out_fd, data\)",
+                r"BrokenPipeError: \[Errno 32\] Broken pipe"]
+
+            self.allowed_messages += [
+                r"while .*result := self.consume_one_frame.*",
+                r"self._protocol.data_received\(data\)",
+                r"File .*/cockpit/protocol.py.*",
+                r"self.frame_received.*",
+                r"File .*/cockpit/channel.py.*",
+                r"self.channel_control_received.*",
+                r"endpoint.do_channel_control.*",
+                r"File .*/cockpit/router.py.*",
+                r"self.do_control.*",
+                r"self.do_done.*",
+                r"File .*/cockpit/channels/packages.py.*",
+                r"self.router.packages.serve_file.*",
+                r"File .*/cockpit/packages.py.*",
+                r"self.serve_package_file.*",
+                r"self.packages.*.serve_file.*",
+                r"KeyError: 'manifests.json'"]
+
+            # https://cockpit-logs.us-east-1.linodeobjects.com/pull-18052-20221219-220331-9aa9eeeb-fedora-36-pybridge/log.html#150
+            self.allowed_messages += [
+                r"self.channel_data_received\(channel, data\)",
+                r"File .*/cockpit/peer.py.*, in channel_data_received",
+                r"self.send_channel_data\(channel, data\)",
+                r"self.router.write_channel_data\(channel, data\)",
+                r"self.transport.write\(header . payload\)",
+                r"assert not self._closing",
+                r"AssertionError",
+            ]
+
+            self.allowed_messages.append(".* is not in the sudoers file.  This incident will be reported.")
+            self.allowed_messages.append("sudo: no valid sudoers sources found, quitting")
+
+            # TestSuperuser.testWrongPasswd, message should go to the caller, not the journal
+            self.allowed_messages.append("Sorry, try again.")
+            # likewise for TestAccounts.testBasic; should not go to journal
+            self.allowed_messages.append("sudo: no password was provided")
+            self.allowed_messages.append("sudo: .* incorrect password attempt")
+
+            # TestSuperuserOldWebserver.test{,NotAuth}
+            self.allowed_messages.append("session timed out")
+            self.allowed_messages.append("cockpit-ssh.*: refusing to connect to unknown host:.*")
+
+            # TestJournal.testAbrtSegv
+            self.allowed_messages.append("invalid non-UTF8 @data passed as text to web_socket_connection_send.*")
+
+            # TestLogin.testSessionRecordingShell
+            self.allowed_messages.append(r"future.set_exception\(error\)")
 
         messages = machine.journal_messages(matches, 6, cursor=cursor)
 
@@ -1939,6 +2054,11 @@ class MachineCase(unittest.TestCase):
                 self.addCleanup(m.execute, apply_change_action)
             self.addCleanup(m.execute, "mv {0}.cockpittest {0}".format(path))
 
+    def file_exists(self, path: str) -> bool:
+        """Check if file exists on test machine"""
+
+        return self.machine.execute(f"if test -e {path}; then echo yes; fi").strip() != ""
+
     def restore_dir(self, path: str, post_restore_action: Optional[str] = None, reboot_safe: bool = False):
         """Backup/restore a directory for a nondestructive test
 
@@ -1954,8 +2074,7 @@ class MachineCase(unittest.TestCase):
         if not self.is_nondestructive() and not self.machine.ostree_image:
             return  # skip for efficiency reasons
 
-        exists = self.machine.execute("if test -e %s; then echo yes; fi" % path).strip() != ""
-        if not exists:
+        if not self.file_exists(path):
             self.addCleanup(self.machine.execute, "rm -rf {0}".format(path))
             return
 
@@ -1985,8 +2104,7 @@ class MachineCase(unittest.TestCase):
         if not self.is_nondestructive():
             return  # skip for efficiency reasons
 
-        exists = self.machine.execute("if test -e %s; then echo yes; fi" % path).strip() != ""
-        if exists:
+        if self.file_exists(path):
             backup = os.path.join(self.vm_tmpdir, path.replace('/', '_'))
             self.machine.execute("mkdir -p %(vm_tmpdir)s; cp -a %(path)s %(backup)s" % {
                 "vm_tmpdir": self.vm_tmpdir, "path": path, "backup": backup})
@@ -2009,6 +2127,17 @@ class MachineCase(unittest.TestCase):
         m = self.machine
         self.restore_file(path, post_restore_action=post_restore_action)
         m.write(path, content, append=append, owner=owner, perm=perm)
+
+    def enable_root_login(self):
+        """Enable root login
+
+        By default root login is disabled in cockpit, removing the root entry of /etc/cockpit/disallowed-users allows root to login.
+        """
+
+        # fedora-coreos runs cockpit-ws in a containter so does not install cockpit-ws on the host
+        disallowed_conf = '/etc/cockpit/disallowed-users'
+        if not self.machine.ostree_image and self.file_exists(disallowed_conf):
+            self.sed_file('/root/d', disallowed_conf)
 
 
 def jsquote(js: str) -> str:
@@ -2077,6 +2206,29 @@ def no_retry_when_changed(testEntity):
     else:
         raise Error("The no_retry_when_changed decorator can only be used on test classes and test methods")
     return testEntity
+
+
+def todo(reason='', flaky=False):
+    """Tests decorated with @todo are expected to fail.
+
+    An optional reason can be given, and will appear in the TAP output if run
+    via run-tests.
+
+    If flaky=False (the default) then the test is expected to always fail.  An
+    unexpected pass is considered to be an error in that case.  If flaky=True
+    then a pass is not considered to be an error.
+    """
+    def wrapper(testEntity):
+        testEntity._testlib_todo = (reason, flaky)
+        return testEntity
+    return wrapper
+
+
+def todoPybridge(reason=None, flaky=False):
+    if os.getenv('TEST_SCENARIO') == 'pybridge':
+        return todo(reason or 'still fails with python bridge', flaky)
+    else:
+        return lambda testEntity: testEntity
 
 
 def checkRunAxe():

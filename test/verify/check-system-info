@@ -21,7 +21,7 @@ import re
 import time
 
 import parent  # noqa: F401
-from testlib import MachineCase, enableAxe, nondestructive, skipDistroPackage, skipImage, test_main, wait
+from testlib import MachineCase, enableAxe, nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main, wait
 
 
 os_release = """
@@ -191,7 +191,8 @@ class TestSystemInfo(MachineCase):
         with b.wait_timeout(70):
             b.wait_text("#system_uptime", "4 months")
 
-        self.allow_journal_messages("error loading contents of os-release: .*",
+        self.allow_journal_messages("error loading contents of os-release: .*",  # C bridge
+                                    "Neither /etc/os-release nor /usr/lib/os-release exists",  # py bridge
                                     "sudo: unable to resolve host host1.cockpit.lan: .*")
 
     def set_change_time_dialog_mode(self, mode):
@@ -201,6 +202,7 @@ class TestSystemInfo(MachineCase):
         b.wait_in_text("#system_information_change_systime .pf-c-form__group-label:contains('Set time') + div > .pf-c-select > button", mode)
 
     @skipImage("TODO: systemd-timesyncd responds too slow on Arch Linux", "arch")
+    @todoPybridge()
     def testTime(self):
         m = self.machine
         b = self.browser
@@ -343,6 +345,7 @@ class TestSystemInfo(MachineCase):
         wait(lambda: get_timesyncd_start() > prev_timesyncd_start, delay=0.2)
 
     @nondestructive
+    @todoPybridge()
     def testMotd(self):
         m = self.machine
         b = self.browser
@@ -818,7 +821,8 @@ password=foobar
         wait(lambda: progressValue(1) > 75)
         m.execute("pkill -e -f [c]at.*urandom")
         # should go back to idle usage
-        wait(lambda: progressValue(1) < 20)
+        # HACK: work around pmie CPU usage https://bugzilla.redhat.com/show_bug.cgi?id=2140572
+        wait(lambda: progressValue(1) < 20, tries=200)
 
         # memory: our test machines should use a reasonable chunk of available memory; MiB or GiB
         b.wait_in_text(".system-usage tr:nth-child(2)", "iB")
@@ -840,7 +844,7 @@ password=foobar
         self.assertGreater(hog_usage, initial_usage + 10)
 
         m.execute("kill %d" % mem_hog)
-        # Should go back to initial_usage, but it doesn't always, for example on fedora-35.
+        # Should go back to initial_usage, but it doesn't always, for example on fedora.
         # So let's be happy if the usage drops significantly
         wait(lambda: progressValue(2) <= hog_usage - 15)
         self.assertGreater(progressValue(2), 10)

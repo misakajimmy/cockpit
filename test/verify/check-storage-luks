@@ -19,7 +19,7 @@
 
 import parent  # noqa: F401
 from storagelib import StorageCase
-from testlib import skipImage, test_main, wait
+from testlib import test_main, todoPybridge, wait
 
 
 class TestStorageLuks(StorageCase):
@@ -29,6 +29,7 @@ class TestStorageLuks(StorageCase):
         "0": {"memory_mb": 1536}
     }
 
+    @todoPybridge()
     def testLuks(self):
         self.allow_journal_messages("Device is not initialized.*", ".*could not be opened.")
         m = self.machine
@@ -189,7 +190,6 @@ class TestStorageLuks(StorageCase):
         b.logout()
         wait(lambda: m.execute("(loginctl list-users | grep admin) || true") == "")
 
-    @skipImage("TODO: clevis missing on Arch image", "arch")
     def testClevisTang(self):
         m = self.machine
         b = self.browser
@@ -271,14 +271,13 @@ class TestStorageLuks(StorageCase):
         self.confirm()
         b.wait_not_present(panel + "ul li:nth-child(2)")
 
-    @skipImage("TODO: luksmeta/clevis missing from Arch Image", "arch")
     def testLuks1Slots(self):
         self.allow_journal_messages("Device is not initialized.*", ".*could not be opened.")
         m = self.machine
         b = self.browser
 
         # This should work without any of the Clevis stuff.
-        m.execute("rm /usr/bin/luksmeta /usr/bin/clevis*")
+        m.execute("rm -f /usr/bin/luksmeta /usr/bin/clevis*")
 
         mount_point_secret = "/run/secret"
 

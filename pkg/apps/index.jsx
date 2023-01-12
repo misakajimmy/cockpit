@@ -19,11 +19,12 @@
 
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import "polyfills";
+import 'cockpit-dark-theme'; // once per page
 
 import cockpit from "cockpit";
 
 import React, { useState } from "react";
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ApplicationList } from "./application-list.jsx";
@@ -70,7 +71,8 @@ const App = () => {
 };
 
 function init() {
-    ReactDOM.render(<App />, document.getElementById("apps-page"));
+    const root = createRoot(document.getElementById("apps-page"));
+    root.render(<App />);
 }
 
 document.addEventListener("DOMContentLoaded", init);

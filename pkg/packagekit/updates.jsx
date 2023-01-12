@@ -18,10 +18,11 @@
  */
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import 'polyfills'; // once per application
+import 'cockpit-dark-theme'; // once per page
 
 import cockpit from "cockpit";
 import React, { useState, useEffect } from "react";
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import {
     Alert, Badge, Button, Gallery, Modal, Popover, Tooltip,
@@ -240,8 +241,27 @@ function getSeverityURL(urls) {
     return highestURL;
 }
 
-function updateItem(info, pkgNames, key) {
+// Overrides the link_open function to apply our required HTML attributes
+function customRemarkable() {
     const remarkable = new Remarkable();
+
+    const orig_link_open = remarkable.renderer.rules.link_open;
+    remarkable.renderer.rules.link_open = function() {
+        let result = orig_link_open.apply(null, arguments);
+
+        const parser = new DOMParser();
+        const htmlDocument = parser.parseFromString(result, "text/html");
+        const links = htmlDocument.getElementsByTagName("a");
+        if (links.length === 1) {
+            const href = links[0].getAttribute("href");
+            result = `<a rel="noopener noreferrer" target="_blank" href="${href}">`;
+        }
+        return result;
+    };
+    return remarkable;
+}
+
+function updateItem(remarkable, info, pkgNames, key) {
     let bugs = null;
     if (info.bug_urls && info.bug_urls.length) {
         // we assume a bug URL ends with a number; if not, show the complete URL
@@ -282,16 +302,20 @@ function updateItem(info, pkgNames, key) {
         type = (
             <>
                 <Tooltip id="tip-severity" content={ secSeverity || _("security") }>
-                    {icon}
-                    { (info.cve_urls && info.cve_urls.length > 0) ? info.cve_urls.length : "" }
+                    <span>
+                        {icon}
+                        { (info.cve_urls && info.cve_urls.length > 0) ? info.cve_urls.length : "" }
+                    </span>
                 </Tooltip>
             </>);
     } else {
         const tip = (info.severity >= PK.Enum.INFO_NORMAL) ? _("bug fix") : _("enhancement");
         type = (
             <Tooltip id="tip-severity" content={tip}>
-                {icon}
-                { bugs ? info.bug_urls.length : "" }
+                <span>
+                    {icon}
+                    { bugs ? info.bug_urls.length : "" }
+                </span>
             </Tooltip>
         );
     }
@@ -327,7 +351,7 @@ function updateItem(info, pkgNames, key) {
     }
 
     const expandedContent = (
-        <>
+        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }}>
             <DescriptionList>
                 <DescriptionListGroup>
                     <DescriptionListTerm>{_("Packages")}</DescriptionListTerm>
@@ -358,8 +382,8 @@ function updateItem(info, pkgNames, key) {
                     </DescriptionListGroup>
                     : null }
             </DescriptionList>
-            {description}
-        </>
+            <TextContent>{description}</TextContent>
+        </Flex>
     );
 
     return {
@@ -379,6 +403,7 @@ function updateItem(info, pkgNames, key) {
 }
 
 const UpdatesList = ({ updates }) => {
+    const remarkable = customRemarkable();
     const update_ids = [];
 
     // PackageKit doesn"t expose source package names, so group packages with the same version and changelog
@@ -418,7 +443,7 @@ const UpdatesList = ({ updates }) => {
                     { title: _("Severity"), transforms: [cellWidth(15)] },
                     { title: _("Details"), transforms: [cellWidth(30)] },
                 ]}
-                rows={update_ids.map(id => updateItem(updates[id], packageNames[id].sort((a, b) => a.name > b.name), id))} />
+                rows={update_ids.map(id => updateItem(remarkable, updates[id], packageNames[id].sort((a, b) => a.name > b.name), id))} />
     );
 };
 
@@ -491,7 +516,6 @@ class RestartServices extends React.Component {
                    title={_("Restart services")}
                    footer={
                        <>
-                           {this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />}
                            {this.props.tracerPackages.daemons.includes("cockpit") &&
                                <Alert variant="warning"
                                    title={_("Web Console will restart")}
@@ -510,7 +534,10 @@ class RestartServices extends React.Component {
                            </Button>
                        </>
                    }>
-                {body}
+                <Stack hasGutter>
+                    {this.state.dialogError && <ModalError dialogError={this.state.dialogError} dialogErrorDetail={this.state.dialogErrorDetail} />}
+                    <StackItem>{body}</StackItem>
+                </Stack>
             </Modal>
         );
     }
@@ -1424,7 +1451,7 @@ class OsUpdates extends React.Component {
 
             return (
                 <>
-                    <PageSection className="ct-pagesection-mobile">
+                    <PageSection>
                         <Gallery className='ct-cards-grid' hasGutter>
                             <CardsPage handleRefresh={this.handleRefresh}
                                        applySecurity={applySecurity}
@@ -1561,7 +1588,7 @@ class OsUpdates extends React.Component {
 
             return (
                 <>
-                    <PageSection className="ct-pagesection-mobile">
+                    <PageSection>
                         <Gallery className='ct-cards-grid' hasGutter>
                             <CardsPage onValueChanged={this.onValueChanged} handleRefresh={this.handleRefresh} {...this.state} />
                         </Gallery>
@@ -1603,7 +1630,7 @@ class OsUpdates extends React.Component {
     render() {
         let content = this.renderContent();
         if (!["available", "uptodate"].includes(this.state.state))
-            content = <PageSection variant={PageSectionVariants.light} className="ct-pagesection-mobile">{content}</PageSection>;
+            content = <PageSection variant={PageSectionVariants.light}>{content}</PageSection>;
 
         return (
             <WithDialogs>
@@ -1618,5 +1645,6 @@ class OsUpdates extends React.Component {
 document.addEventListener("DOMContentLoaded", () => {
     document.title = cockpit.gettext(document.title);
     init();
-    ReactDOM.render(<OsUpdates />, document.getElementById("app"));
+    const root = createRoot(document.getElementById('app'));
+    root.render(<OsUpdates />);
 });

@@ -71,6 +71,8 @@ class SourceDirectory(PodmanTemporaryDirectory):
         else:
             opts = []
 
+        opts.extend(f'--recurse-submodule={name}' for name in args.submodule)
+
         git('clone', *opts, '.', self.name)
 
         if not args.head and not args.branch:
@@ -114,6 +116,9 @@ def main():
     group.add_argument('--user', help="Pass through the --user flag to podman")
     group.add_argument('--entrypoint', metavar='CMD', help="Provide the --entrypoint flag to podman")
     group.add_argument('--workdir', help="Provide the --workdir flag to podman")
+
+    group = parser.add_argument_group(title='Clone options')
+    group.add_argument('--submodule', action='append', default=[], help='Check out this submodule')
 
     group = parser.add_argument_group(title='What to build').add_mutually_exclusive_group()
     group.add_argument('--head', action='store_true', help='Build the HEAD commit')

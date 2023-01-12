@@ -18,13 +18,14 @@
 # along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
 
 import parent  # noqa: F401
-from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, test_main
+from testlib import MachineCase, nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main
 
 
 @skipDistroPackage()
 @nondestructive
 class TestReauthorize(MachineCase):
 
+    @todoPybridge()
     def testBasic(self):
         self.allow_journal_messages('.*dropping message while waiting for child to exit.*')
         b = self.browser
@@ -78,7 +79,7 @@ class TestReauthorize(MachineCase):
 
         # When root, the 'Limited access' etc indicators should not be visible
         b.logout()
-        self.login_and_go("/playground/test", user="root")
+        self.login_and_go("/playground/test", user="root", enable_root_login=True)
         b.click(".super-channel button")
         b.wait_in_text(".super-channel span", 'result: uid=0')
         b.leave_page()

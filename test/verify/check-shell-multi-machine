@@ -22,7 +22,7 @@ import subprocess
 import time
 
 import parent  # noqa: F401
-from testlib import MachineCase, skipDistroPackage, skipImage, test_main
+from testlib import MachineCase, skipDistroPackage, skipImage, todoPybridge, test_main
 
 
 def break_hostkey(m, address):
@@ -136,6 +136,7 @@ def change_ssh_port(machine, address, port=None, timeout_sec=120):
 
 
 @skipDistroPackage()
+@todoPybridge()
 class TestMultiMachineAdd(MachineCase):
     provision = {
         "machine1": {"address": "10.111.113.1/20", "memory_mb": 660},
@@ -322,7 +323,7 @@ class TestMultiMachine(MachineCase):
         b.wait_js_cond(f'window.location.pathname == "{root}=10.111.113.2/system"')
 
         b.click("#hosts-sel button")
-        b.wait_in_text("a[href='/@localhost']", "machine2")
+        b.wait_in_text(f"a[href='{root}=10.111.113.2/@localhost']", "machine2")
         b.wait_not_present("a[href='/@10.111.113.2']")
         b.logout()
 
@@ -389,6 +390,7 @@ class TestMultiMachine(MachineCase):
         self.machine.start_cockpit()
         self.checkDirectLogin('/')
 
+    @todoPybridge()
     def testUrlRoot(self):
         b = self.browser
         m = self.machine
@@ -422,10 +424,9 @@ class TestMultiMachine(MachineCase):
         b.wait_js_cond('window.location.pathname == "/cockpit-new/@10.111.113.2/system"')
 
         # Test subnav
-        b.click_system_menu("/@10.111.113.2/users", enter=False)
+        b.click_system_menu("/cockpit-new/@10.111.113.2/users", enter=False)
         b.enter_page("/users", host="10.111.113.2")
-        b.wait_visible("#accounts-list")
-        b.click("#accounts-list .pf-c-card:first-child")
+        b.click('#accounts-list td[data-label="Username"] a[href="#/admin"]')
         b.wait_text("#account-user-name", "admin")
         b.switch_to_top()
         b.wait_js_cond('window.location.pathname == "/cockpit-new/@10.111.113.2/users"')
@@ -451,6 +452,7 @@ class TestMultiMachine(MachineCase):
         b.switch_to_top()
         b.wait_js_cond('window.location.pathname == "/cockpit-new/system"')
 
+    @todoPybridge()
     def testExternalPage(self):
         b = self.browser
         m1 = self.machine
@@ -482,6 +484,7 @@ class TestMultiMachine(MachineCase):
 
         self.allow_hostkey_messages()
 
+    @todoPybridge()
     def testFrameNavigation(self):
         b = self.browser
         m2 = self.machine2
@@ -567,6 +570,7 @@ class TestMultiMachine(MachineCase):
                                     ".*: bridge program failed: Child process exited with code .*",
                                     "/playground/test.html: failed to retrieve resource: authentication-failed")
 
+    @todoPybridge()
     def testFrameReload(self):
         b = self.browser
 
@@ -608,6 +612,7 @@ class TestMultiMachine(MachineCase):
 
         self.allow_hostkey_messages()
 
+    @todoPybridge()
     def testTroubleshooting(self):
         b = self.browser
         m1 = self.machine
@@ -708,7 +713,7 @@ class TestMultiMachine(MachineCase):
 
         change_ssh_port(m2, "10.111.113.2", 2222)
         m2.disconnect()
-        m2 = None  # No more access to m2
+        del m2  # No more access to m2
 
         self.login_and_go(None)
         b.go(machine_path)
@@ -742,6 +747,7 @@ class TestMultiMachine(MachineCase):
                                     '.*: server offered unsupported authentication methods: .*')
 
     @skipImage("TODO: Broken on Arch Linux", "arch")
+    @todoPybridge()
     def testSshKeySetup(self):
         b = self.browser
         m1 = self.machine
@@ -838,6 +844,7 @@ class TestMultiMachine(MachineCase):
 
         self.allow_hostkey_messages()
 
+    @todoPybridge()
     def testSshKeySetupCustom(self):
         b = self.browser
         m1 = self.machine

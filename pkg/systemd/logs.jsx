@@ -18,10 +18,11 @@
  */
 
 import '../lib/patternfly/patternfly-4-cockpit.scss';
+import 'cockpit-dark-theme'; // once per page
 
 import cockpit from "cockpit";
 import React, { useState, useEffect } from 'react';
-import ReactDOM from "react-dom";
+import { createRoot } from 'react-dom/client';
 
 import {
     Button,
@@ -183,7 +184,7 @@ export const LogsPage = () => {
 
     return (
         <Page>
-            <PageSection id="journal" padding={{ default: 'noPadding' }} className="ct-pagesection-mobile">
+            <PageSection id="journal" padding={{ default: 'noPadding' }}>
                 <Toolbar>
                     <ToolbarContent>
                         <ToolbarToggleGroup className="pf-u-flex-wrap pf-u-flex-grow-1" toggleIcon={<><span className="pf-c-button__icon pf-m-start"><FilterIcon /></span>{_("Toggle filters")}</>} breakpoint="md">
@@ -410,7 +411,7 @@ const TextFilter = ({ textFilter, onTextFilterChange, filteredQuery }) => {
                                      target="blank" rel="noopener noreferrer">
                              {_("journalctl manpage")}
                          </Button>
-                         <ClipboardCopy clickTip={_("Successfully copied to keyboard")}
+                         <ClipboardCopy clickTip={_("Successfully copied to clipboard")}
                                             isReadOnly
                                             hoverTip={_("Copy to clipboard")}
                                             id="journal-cmd-copy"
@@ -423,7 +424,8 @@ const TextFilter = ({ textFilter, onTextFilterChange, filteredQuery }) => {
 };
 
 function init() {
-    ReactDOM.render(<LogsPage />, document.getElementById("logs"));
+    const root = createRoot(document.getElementById('logs'));
+    root.render(<LogsPage />);
 }
 
 document.addEventListener("DOMContentLoaded", init);

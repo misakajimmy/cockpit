@@ -32,11 +32,12 @@ import {
     Popover,
     Progress, ProgressVariant,
     Select, SelectOption,
+    Stack, StackItem,
     Switch,
     Text, TextContent, TextVariants,
     Tooltip,
 } from '@patternfly/react-core';
-import { Table, TableHeader, TableBody, TableGridBreakpoint, TableVariant, TableText, RowWrapper, cellWidth } from '@patternfly/react-table';
+import { Table, TableHeader, TableBody, TableGridBreakpoint, TableVariant, TableText, RowWrapper, cellWidth, fitContent } from '@patternfly/react-table';
 import { ExclamationTriangleIcon, ExclamationCircleIcon, CogIcon, ExternalLinkAltIcon } from '@patternfly/react-icons';
 
 import cockpit from 'cockpit';
@@ -159,6 +160,8 @@ const CURRENT_METRICS = [
     { name: "cpu.core.user", derive: "rate" },
     { name: "cpu.core.system", derive: "rate" },
     { name: "cpu.core.nice", derive: "rate" },
+    { name: "disk.dev.read", units: "bytes", derive: "rate" },
+    { name: "disk.dev.written", units: "bytes", derive: "rate" },
 ];
 
 const CPU_TEMPERATURE_METRICS = [
@@ -223,6 +226,7 @@ class CurrentMetrics extends React.Component {
         this.netInterfacesNames = [];
         this.cgroupCPUNames = [];
         this.cgroupMemoryNames = [];
+        this.disksNames = [];
         this.cpuTemperatureColors = {
             textColor: "",
             iconColor: "",
@@ -306,6 +310,9 @@ class CurrentMetrics extends React.Component {
                     /* hide read-only loop mounts; these are often things like snaps or iso images
                      * which are always at 100% capacity, but are uninteresting for disk usage alerts */
                     if ((fields[0].indexOf("/loop") >= 0 && options.indexOf('ro') >= 0))
+                        result.add(fields[1]);
+                    /* hide flatpaks */
+                    if ((fields[0].indexOf('revokefs-fuse') >= 0 && fields[1].indexOf('flatpak') >= 0))
                         result.add(fields[1]);
                 });
         return result;
@@ -409,6 +416,8 @@ class CurrentMetrics extends React.Component {
             console.assert(data.metrics[9].name === 'cgroup.cpu.usage');
             this.cgroupCPUNames = data.metrics[9].instances.slice();
             this.cgroupMemoryNames = data.metrics[10].instances.slice();
+            console.assert(data.metrics[14].name === 'disk.dev.read');
+            this.disksNames = data.metrics[14].instances.slice();
             debug("metrics message was meta, new net instance names", JSON.stringify(this.netInterfacesNames));
             return;
         }
@@ -525,7 +534,7 @@ class CurrentMetrics extends React.Component {
 
         const topServicesMemory = n_biggest(this.cgroupMemoryNames, this.samples[10], 5);
         newState.topServicesMemory = topServicesMemory.map(
-            ([key, value, is_user, is_container, userid]) => cgroupRow(key, cockpit.format_bytes(value), is_user, is_container)
+            ([key, value, is_user, is_container, userid]) => cgroupRow(key, cockpit.format_bytes(value), is_user, is_container, userid)
         );
 
         const notMappedContainers = topServicesMemory.concat(topServicesCPU).filter(([key, value, is_user, is_container, userid]) => is_container && getCachedPodName(userid, key) === undefined);
@@ -641,6 +650,39 @@ class CurrentMetrics extends React.Component {
             cpu_label = this.state.cpuUsed + '%';
         }
 
+        const disksUsage = (this.disksNames.length > 0 && this.samples[14] && this.samples[15])
+            ? (
+                this.disksNames.map((name, i) => [
+                    name,
+                    this.samples[14][i] >= 1 ? cockpit.format_bytes_per_sec(this.samples[14][i]) : "0",
+                    this.samples[15][i] >= 1 ? cockpit.format_bytes_per_sec(this.samples[15][i]) : "0",
+                ])
+            )
+            : [];
+
+        let allDisks = null;
+        if (disksUsage.length > 1) {
+            const disksTableContent = (
+                <Table
+                    variant={TableVariant.compact}
+                    gridBreakPoint={TableGridBreakpoint.gridLg}
+                    borders={false}
+                    aria-label={ _("Disks usage") }
+                    cells={ [{ title: _("Device"), transforms: [fitContent] }, _("Read"), _("Write")] }
+                    rows={disksUsage}
+                    rowWrapper={ props => <RowWrapper device-name={ props.row[0] } {...props} /> }>
+                    <TableHeader />
+                    <TableBody className="pf-m-tabular-nums disks-nowrap" />
+                </Table>
+            );
+
+            allDisks = (
+                <Popover minWidth={0} aria-label={ _("View all disks") } bodyContent={disksTableContent}>
+                    <Button variant="link" className='pf-u-font-size-sm'>{ _("View per-disk throughput") }</Button>
+                </Popover>
+            );
+        }
+
         return (
             <Gallery className="current-metrics" hasGutter>
                 <Card id="current-metrics-card-cpu">
@@ -732,7 +774,7 @@ class CurrentMetrics extends React.Component {
                     </CardBody>
                 </Card>
 
-                <Card>
+                <Card id="current-metrics-card-disks">
                     <CardTitle>{ _("Disks") }</CardTitle>
                     <CardBody>
                         <DescriptionList isHorizontal columnModifier={{ default: '2Col' }}>
@@ -745,7 +787,9 @@ class CurrentMetrics extends React.Component {
                                 <DescriptionListDescription id="current-disks-write">{ this.state.disksWritten >= 1 ? cockpit.format_bytes_per_sec(this.state.disksWritten) : "0" }</DescriptionListDescription>
                             </DescriptionListGroup>
                         </DescriptionList>
-
+                        <div className="all-disks-no-gap">
+                            {allDisks}
+                        </div>
                         <div id="current-disks-usage" className="progress-stack"> {
                             this.state.mounts.map(info => {
                                 let progress = (
@@ -788,7 +832,7 @@ class CurrentMetrics extends React.Component {
                             cells={ [_("Interface"), _("In"), _("Out")] } rows={netIO}
                             rowWrapper={ props => <RowWrapper data-interface={ props.row[0] } {...props} /> }>
                             <TableHeader />
-                            <TableBody />
+                            <TableBody className="network-nowrap-shrink" />
                         </Table>
                     </CardBody>
                 </Card>
@@ -1004,7 +1048,6 @@ class MetricsHour extends React.Component {
 
         this.state = {
             minuteGraphs: [],
-            minutes: 0,
             dataItems: 0,
         };
 
@@ -1083,7 +1126,7 @@ class MetricsHour extends React.Component {
             minuteGraphs.push(<MetricsMinute key={minute} minute={minute} data={dataSlice} rawData={rawSlice} events={minute_events[minute]} startTime={this.props.startTime} />);
         }
 
-        this.setState({ minuteGraphs: minuteGraphs, minutes: minutes, dataItems: this.props.data.length });
+        this.setState({ minuteGraphs: minuteGraphs, dataItems: this.props.data.length });
     }
 
     render() {
@@ -1227,8 +1270,6 @@ const PCPConfigDialog = ({
               </div>
           }
                    footer={<>
-                       { dialogError && <ModalError dialogError={ _("Failed to configure PCP") } dialogErrorDetail={dialogError} /> }
-
                        <Button variant='primary' onClick={handleSave} isDisabled={pending} isLoading={pending}>
                            { _("Save") }
                        </Button>
@@ -1238,36 +1279,41 @@ const PCPConfigDialog = ({
                    </>
                    }>
 
-            <Switch id="switch-pmlogger"
-                        isChecked={dialogLoggerValue}
-                        isDisabled={!s_pmlogger.exists && !packagekitExists}
-                        label={
-                            <Flex spaceItems={{ modifier: 'spaceItemsXl' }}>
-                                <FlexItem>{ _("Collect metrics") }</FlexItem>
-                                <TextContent>
-                                    <Text component={TextVariants.small}>(pmlogger.service)</Text>
-                                </TextContent>
-                            </Flex>
-                        }
-                        onChange={enable => {
-                            // pmproxy needs pmlogger, auto-disable it
-                            setDialogLoggerValue(enable);
-                            if (!enable)
-                                setDialogProxyValue(false);
-                        }} />
+            <Stack hasGutter>
+                { dialogError && <ModalError dialogError={ _("Failed to configure PCP") } dialogErrorDetail={dialogError} /> }
+                <StackItem>
+                    <Switch id="switch-pmlogger"
+                                isChecked={dialogLoggerValue}
+                                isDisabled={!s_pmlogger.exists && !packagekitExists}
+                                label={
+                                    <Flex spaceItems={{ modifier: 'spaceItemsXl' }}>
+                                        <FlexItem>{ _("Collect metrics") }</FlexItem>
+                                        <TextContent>
+                                            <Text component={TextVariants.small}>(pmlogger.service)</Text>
+                                        </TextContent>
+                                    </Flex>
+                                }
+                                onChange={enable => {
+                                    // pmproxy needs pmlogger, auto-disable it
+                                    setDialogLoggerValue(enable);
+                                    if (!enable)
+                                        setDialogProxyValue(false);
+                                }} />
 
-            <Switch id="switch-pmproxy"
-                        isChecked={dialogProxyValue}
-                        label={
-                            <Flex spaceItems={{ modifier: 'spaceItemsXl' }}>
-                                <FlexItem>{ _("Export to network") }</FlexItem>
-                                <TextContent>
-                                    <Text component={TextVariants.small}>(pmproxy.service)</Text>
-                                </TextContent>
-                            </Flex>
-                        }
-                        isDisabled={ !dialogLoggerValue }
-                        onChange={enable => setDialogProxyValue(enable)} />
+                    <Switch id="switch-pmproxy"
+                                isChecked={dialogProxyValue}
+                                label={
+                                    <Flex spaceItems={{ modifier: 'spaceItemsXl' }}>
+                                        <FlexItem>{ _("Export to network") }</FlexItem>
+                                        <TextContent>
+                                            <Text component={TextVariants.small}>(pmproxy.service)</Text>
+                                        </TextContent>
+                                    </Flex>
+                                }
+                                isDisabled={ !dialogLoggerValue }
+                            onChange={enable => setDialogProxyValue(enable)} />
+                </StackItem>
+            </Stack>
         </Modal>);
 };
 
@@ -1614,9 +1660,9 @@ class MetricsHistory extends React.Component {
             return (
                 <div className={"metrics-label metrics-label-graph" + (props.items.length > 1 ? " have-saturation" : "")}>
                     <span>{props.label}</span>
-                    <span className="metrics-sublabels">
-                        { props.items.map(i => <span key={i}>{i}</span>) }
-                    </span>
+                    <TextContent className="metrics-sublabels">
+                        { props.items.map(i => <Text component={TextVariants.small} key={i}>{i}</Text>) }
+                    </TextContent>
                 </div>
             );
         }
@@ -1689,10 +1735,10 @@ export const Application = () => {
             }>
                 { firewalldRequest &&
                 <FirewalldRequest service={firewalldRequest.service} title={firewalldRequest.title} pageSection /> }
-                <PageSection className="ct-pagesection-mobile">
+                <PageSection>
                     <CurrentMetrics />
                 </PageSection>
-                <PageSection className="ct-pagesection-mobile">
+                <PageSection>
                     <MetricsHistory firewalldRequest={setFirewalldRequest}
                                     needsLogout={needsLogout}
                                     setNeedsLogout={setNeedsLogout} />

@@ -49,10 +49,13 @@ import './cockpit-components-table.scss';
  *   }[]
  * - emptyCaption: header caption to show if list is empty
  * - emptyCaptionDetail: extra details to show after emptyCaption if list is empty
+ * - emptyComponent: Whole empty state component to show if the list is empty
  * - isEmptyStateInTable: if empty state is result of a filter function this should be set, otherwise false
+ * - loading: Set to string when the content is still loading. This string is shown.
  * - variant: For compact tables pass 'compact'
  * - gridBreakPoint: Specifies the grid breakpoints ('', 'grid' | 'grid-md' | 'grid-lg' | 'grid-xl' | 'grid-2xl')
  * - sortBy: { index: Number, direction: SortByDirection }
+ * - sortMethod: callback function used for sorting rows. Called with 3 parameters: sortMethod(rows, activeSortDirection, activeSortIndex)
  * - style: object of additional css rules
  * - afterToggle: function to be called when content is toggled
  */
@@ -64,12 +67,15 @@ export const ListingTable = ({
     columns: cells = [],
     emptyCaption = '',
     emptyCaptionDetail,
+    emptyComponent,
     isEmptyStateInTable = false,
+    loading = '',
     onRowClick,
     onSelect,
     rows: tableRows = [],
     showHeader = true,
     sortBy,
+    sortMethod,
     ...extraProps
 }) => {
     let rows = tableRows;
@@ -85,7 +91,7 @@ export const ListingTable = ({
             const keys = [];
 
             rows.forEach(row => {
-                if (row.props && row.props.key)
+                if (row.props && row.props.key !== undefined)
                     keys.push(row.props.key);
             });
 
@@ -99,11 +105,13 @@ export const ListingTable = ({
         // Don't highlight all when the list gets loaded
         if (currentRowsKeys.length !== 0) {
             const new_keys = current_keys.filter(key => currentRowsKeys.indexOf(key) === -1);
-            if (new_keys.length)
+            if (new_keys.length) {
+                setTimeout(() => setNewItems(items => items.filter(item => new_keys.indexOf(item) < 0)), 4000);
                 setNewItems([...newItems, ...new_keys]);
+            }
         }
 
-        setCurrentRowsKeys(current_keys);
+        setCurrentRowsKeys([...new Set([...currentRowsKeys, ...current_keys])]);
     }, [rows, currentRowsKeys, newItems]);
 
     const isSortable = cells.some(col => col.sortable);
@@ -127,20 +135,31 @@ export const ListingTable = ({
             : null
     );
 
+    if (loading)
+        return <EmptyState>
+            <EmptyStateBody>
+                {loading}
+            </EmptyStateBody>
+        </EmptyState>;
+
     if (rows == 0) {
-        const emptyState = (
-            <EmptyState>
-                <EmptyStateBody>
-                    <div>{emptyCaption}</div>
-                    <TextContent>
-                        <Text component={TextVariants.small}>
-                            {emptyCaptionDetail}
-                        </Text>
-                    </TextContent>
-                </EmptyStateBody>
-                {actions.length > 0 ? <EmptyStateSecondaryActions>{actions}</EmptyStateSecondaryActions> : null}
-            </EmptyState>
-        );
+        let emptyState = null;
+        if (emptyComponent)
+            emptyState = emptyComponent;
+        else
+            emptyState = (
+                <EmptyState>
+                    <EmptyStateBody>
+                        <div>{emptyCaption}</div>
+                        <TextContent>
+                            <Text component={TextVariants.small}>
+                                {emptyCaptionDetail}
+                            </Text>
+                        </TextContent>
+                    </EmptyStateBody>
+                    {actions.length > 0 ? <EmptyStateSecondaryActions>{actions}</EmptyStateSecondaryActions> : null}
+                </EmptyState>
+            );
         if (!isEmptyStateInTable)
             return emptyState;
 
@@ -169,7 +188,7 @@ export const ListingTable = ({
         setActiveSortDirection(direction);
     };
 
-    const rowsComponents = (isSortable ? sortRows() : rows).map((row, rowIndex) => {
+    const rowsComponents = (isSortable ? (sortMethod ? sortMethod(rows, activeSortDirection, activeSortIndex) : sortRows()) : rows).map((row, rowIndex) => {
         const rowProps = row.props || {};
         if (onRowClick) {
             rowProps.isHoverable = true;

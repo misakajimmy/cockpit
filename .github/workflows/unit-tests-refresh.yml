@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Clone repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           # need this to also fetch tags
           fetch-depth: 0
@@ -30,7 +30,8 @@ jobs:
 
       - name: Run i386 clang check-memory test
         timeout-minutes: 20
-        run: containers/unit-tests/start --verbose --env=CC=clang --image-tag=i386 --make check-memory
+        # HACK: https://bugs.kde.org/show_bug.cgi?id=452758
+        run: containers/unit-tests/start --verbose --env=CC=clang --env=CFLAGS='-O2 -gdwarf-4' --image-tag=i386 --make check-memory
 
       - name: Run amd64 clang distcheck test
         timeout-minutes: 15

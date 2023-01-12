@@ -37,10 +37,13 @@ dependencies="\
     libssh-4-dbgsym \
     libssh-dev \
     libsystemd-dev \
+    mypy \
     npm \
     nodejs \
     pkg-config \
     python3 \
+    python3-pytest-cov \
+    python3-pytest-timeout \
     sassc \
     ssh \
     strace \

@@ -74,6 +74,13 @@ Source0:        https://github.com/cockpit-project/cockpit/releases/download/%{v
 %define build_optional 1
 %endif
 
+# Allow root login in Cockpit on RHEL 8 and lower as it also allows password login over SSH.
+%if 0%{?rhel} && 0%{?rhel} <= 8
+%define disallow_root 0
+%else
+%define disallow_root 1
+%endif
+
 # Ship custom SELinux policy (but not for cockpit-appstream)
 %if "%{name}" == "cockpit"
 %define selinuxtype targeted
@@ -147,6 +154,8 @@ Suggests: cockpit-pcp
 
 %if 0%{?rhel} == 0
 Recommends: (cockpit-networkmanager if NetworkManager)
+# c-ostree is not in RHEL 8/9
+Recommends: (cockpit-ostree if rpm-ostree)
 Suggests: cockpit-selinux
 %endif
 %if 0%{?rhel} && 0%{?centos} == 0
@@ -254,7 +263,8 @@ done
 for libexec in cockpit-askpass cockpit-session cockpit-ws cockpit-tls cockpit-wsinstance-factory cockpit-client cockpit-client.ui cockpit-desktop cockpit-certificate-helper cockpit-certificate-ensure; do
     rm %{buildroot}/%{_libexecdir}/$libexec
 done
-rm -r %{buildroot}/%{_libdir}/security %{buildroot}/%{_sysconfdir}/pam.d %{buildroot}/%{_sysconfdir}/motd.d %{buildroot}/%{_sysconfdir}/issue.d
+rm -r %{buildroot}/%{_sysconfdir}/pam.d %{buildroot}/%{_sysconfdir}/motd.d %{buildroot}/%{_sysconfdir}/issue.d
+rm -f %{buildroot}/%{_libdir}/security/pam_*
 rm %{buildroot}/usr/bin/cockpit-bridge
 rm -f %{buildroot}%{_libexecdir}/cockpit-ssh
 rm -f %{buildroot}%{_datadir}/metainfo/cockpit.appdata.xml
@@ -266,7 +276,7 @@ for pkg in apps packagekit pcp playground storaged; do
     rm -rf %{buildroot}/%{_datadir}/cockpit/$pkg
 done
 # files from -tests
-rm -r %{buildroot}/%{_prefix}/%{__lib}/cockpit-test-assets
+rm -f %{buildroot}/%{pamdir}/mock-pam-conv-mod.so
 # files from -pcp
 rm -r %{buildroot}/%{_libexecdir}/cockpit-pcp %{buildroot}/%{_localstatedir}/lib/pcp/
 # files from -storaged
@@ -319,8 +329,6 @@ troubleshooting, interactive command-line sessions, and more.
 Summary: Cockpit bridge server-side component
 Requires: glib-networking
 Provides: cockpit-ssh = %{version}-%{release}
-# PR #10430 dropped workaround for ws' inability to understand x-host-key challenge
-Conflicts: cockpit-ws < 181.x
 # 233 dropped jquery.js, pages started to bundle it (commit 049e8b8dce)
 Conflicts: cockpit-dashboard < 233
 Conflicts: cockpit-networkmanager < 233
@@ -426,6 +434,7 @@ authentication via sssd/FreeIPA.
 # created in %post, so that users can rm the files
 %ghost %{_sysconfdir}/issue.d/cockpit.issue
 %ghost %{_sysconfdir}/motd.d/cockpit
+%ghost %attr(0644, root, root) %{_sysconfdir}/cockpit/disallowed-users
 %dir %{_datadir}/cockpit/motd
 %{_datadir}/cockpit/motd/update-motd
 %{_datadir}/cockpit/motd/inactive.motd
@@ -474,10 +483,16 @@ if [ -x %{_sbindir}/selinuxenabled ]; then
 fi
 
 # set up dynamic motd/issue symlinks on first-time install; don't bring them back on upgrades if admin removed them
+# disable root login on first-time install; so existing installations aren't changed
 if [ "$1" = 1 ]; then
     mkdir -p /etc/motd.d /etc/issue.d
     ln -s ../../run/cockpit/motd /etc/motd.d/cockpit
     ln -s ../../run/cockpit/motd /etc/issue.d/cockpit.issue
+    printf "# List of users which are not allowed to login to Cockpit\n" > /etc/cockpit/disallowed-users
+%if 0%{?disallow_root}
+    printf "root\n" >> /etc/cockpit/disallowed-users
+%endif
+    chmod 644 /etc/cockpit/disallowed-users
 fi
 
 %tmpfiles_create cockpit-tempfiles.conf
@@ -610,8 +625,8 @@ The Cockpit component for managing storage.  This package uses udisks.
 
 %package -n cockpit-tests
 Summary: Tests for Cockpit
-Requires: cockpit-bridge >= 138
-Requires: cockpit-system >= 138
+Requires: cockpit-bridge >= %{required_base}
+Requires: cockpit-system >= %{required_base}
 Requires: openssh-clients
 Provides: cockpit-test-assets = %{version}-%{release}
 
@@ -620,7 +635,7 @@ This package contains tests and files used while testing Cockpit.
 These files are not required for running Cockpit.
 
 %files -n cockpit-tests -f tests.list
-%{_prefix}/%{__lib}/cockpit-test-assets
+%{pamdir}/mock-pam-conv-mod.so
 
 %package -n cockpit-pcp
 Summary: Cockpit PCP integration

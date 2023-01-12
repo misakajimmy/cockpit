@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import glob
 import os
 import string
@@ -16,6 +17,8 @@ import functools
 
 import importlib.machinery
 import importlib.util
+
+from typing import List, Optional, Tuple
 
 import parent
 parent.ensure_bots()  # NOQA: testvm lives in bots/
@@ -38,7 +41,7 @@ def flush_stdout():
 
 
 class Test:
-    def __init__(self, test_id, command, timeout, nondestructive, retry_when_affected, cost=1):
+    def __init__(self, test_id, command, timeout, nondestructive, retry_when_affected, todo, cost=1):
         self.process = None
         self.retries = 0
         self.test_id = test_id
@@ -47,6 +50,7 @@ class Test:
         self.nondestructive = nondestructive
         self.machine_id = None
         self.retry_when_affected = retry_when_affected
+        self.todo = todo
         self.cost = cost
         self.returncode = None
 
@@ -77,7 +81,7 @@ class Test:
 
         return poll_result
 
-    def finish(self, affected_tests, print_tap=True, thorough=False, track_naughties=False):
+    def finish(self, affected_tests: List[str], opts: argparse.Namespace) -> Tuple[Optional[str], int]:
         """Returns if a test should retry or not
 
         Call test-failure-policy on the test's output, print if needed.
@@ -85,9 +89,9 @@ class Test:
         Return (retry_reason, exit_code). retry_reason can be None or a string.
         """
 
+        print_tap = not opts.list
         affected = any([self.command[0].endswith(t) for t in affected_tests])
         retry_reason = ""
-        skip_reason = ""
 
         # Try affected tests 3 times
         if self.returncode == 0 and affected and self.retry_when_affected and self.retries < 2:
@@ -101,14 +105,31 @@ class Test:
             lines = self.output.splitlines()
             skip_reason = lines[-1].strip().decode("utf-8")
             self.output = b"\n".join(lines[:-1])
-
-        if self.returncode in [0, 77]:
             self._print_test(print_tap, skip_reason=skip_reason)
             return None, 0
 
-        if not thorough:
+        # If the test was marked with @todo then...
+        if self.todo is not None:
+            todo_reason, flaky = self.todo
+            if self.returncode == 0 and not flaky:
+                # The test passed, but it shouldn't have.
+                self.returncode = 1  # that's a fail
+                self._print_test(print_tap, todo_reason=f'# expected failure: {todo_reason}')
+                return None, 1
+            else:
+                # The test either failed (always OK) or passed (and flaky=True)
+                # Outputs  'not ok 1 test # TODO ...'
+                #      or  'ok 1 test # TODO ...'
+                self._print_test(print_tap, todo_reason=f'# TODO {todo_reason}')
+                return None, 0
+
+        if self.returncode == 0:
+            self._print_test(print_tap)
+            return None, 0
+
+        if not opts.thorough:
             cmd = ["test-failure-policy"]
-            if not track_naughties:
+            if not opts.track_naughties:
                 cmd.append("--offline")
             cmd.append(testvm.DEFAULT_IMAGE)
             try:
@@ -116,6 +137,7 @@ class Test:
                 reason = proc.communicate(self.output + ("not ok " + str(self)).encode())[0].strip()
 
                 if proc.returncode == 77:
+                    self.returncode = proc.returncode
                     self._print_test(skip_reason="# SKIP {0}".format(reason.decode("utf-8")))
                     return None, 0
 
@@ -127,7 +149,7 @@ class Test:
                     sys.stderr.write("\nCouldn't run test-failure-policy: {0}\n".format(str(ex)))
 
         # HACK: many tests are unstable, always retry them 3 times unless affected
-        if not affected and not retry_reason:
+        if not affected and not retry_reason and not opts.no_retry_fail:
             retry_reason = "be robust against unstable tests"
 
         has_unexpected_message = testlib.UNEXPECTED_MESSAGE.encode() in self.output
@@ -149,7 +171,7 @@ class Test:
         nd = f" [ND@{self.machine_id}]" if self.nondestructive else ""
         return f"{self.test_id} {self.command[0]} {self.command[-1]}{cost}{nd}"
 
-    def _print_test(self, print_tap=True, retry_reason="", skip_reason=""):
+    def _print_test(self, print_tap=True, retry_reason="", skip_reason="", todo_reason=""):
         def write_line(line):
             while line:
                 try:
@@ -171,19 +193,17 @@ class Test:
             retry_reason = " " + retry_reason
         if skip_reason:
             skip_reason = " " + skip_reason
+        if todo_reason:
+            todo_reason = " " + todo_reason
 
         if not print_tap:
-            print(retry_reason + skip_reason)
+            print(retry_reason + skip_reason + todo_reason)
             flush_stdout()
             return
 
         print()  # Tap needs to start on a separate line
-        if self.returncode == 0:
-            print(f"ok {self}{retry_reason}")
-        elif skip_reason:
-            print(f"ok {self}{skip_reason}")
-        else:
-            print(f"not ok {self}{retry_reason}")
+        status = 'ok' if self.returncode in [0, 77] else 'not ok'
+        print(f"{status} {self}{retry_reason}{skip_reason}{todo_reason}")
         flush_stdout()
 
 
@@ -317,12 +337,14 @@ def detect_tests(test_files, image, opts):
                     continue
                 nd = getattr(test_method, "_testlib__non_destructive", False)
                 rwa = getattr(test_method, "_testlib__retry_when_affected", True)
+                todo = getattr(test_method, "_testlib_todo",
+                               getattr(test.__class__, "_testlib_todo", None))
                 if getattr(test.__class__, "provision", None):
                     # each additionally provisioned VM costs parallel test capacity
                     cost = len(test.__class__.provision)
                 else:
                     cost = 1
-                test = Test(test_id, build_command(filename, test_str, opts), test_timeout, nd, rwa, cost=cost)
+                test = Test(test_id, build_command(filename, test_str, opts), test_timeout, nd, rwa, todo, cost=cost)
                 if nd:
                     serial_tests.append(test)
                 else:
@@ -390,7 +412,7 @@ def run(opts, image):
                 made_progress = True
                 running_tests.remove(test)
                 test_machine = test.machine_id  # test_finish() resets it
-                retry_reason, test_result = test.finish(changed_tests, print_tap=not opts.list, thorough=opts.thorough, track_naughties=opts.track_naughties)
+                retry_reason, test_result = test.finish(changed_tests, opts)
                 fail_count += test_result
                 logging.debug(f"test {test} finished; result {test_result} retry reason {retry_reason}")
 
@@ -509,6 +531,8 @@ def main():
                         help="Retry affected tests compared to given base branch; default: %(default)s")
     parser.add_argument('--track-naughties', action='store_true',
                         help='Update the occurrence of naughties on cockpit-project/bots')
+    parser.add_argument('--no-retry-fail', action='store_true',
+                        help="Don't retry failed tests")
     opts = parser.parse_args()
 
     if opts.machine:

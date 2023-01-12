@@ -19,12 +19,12 @@
 
 import parent  # noqa: F401
 from netlib import NetworkCase
-from testlib import nondestructive, skipDistroPackage, skipImage, test_main, wait
+from testlib import nondestructive, skipDistroPackage, todoPybridge, test_main, wait
 
 
 @nondestructive
 @skipDistroPackage()
-@skipImage("TODO: testBasic fails on Arch Linux", "arch")
+@todoPybridge()
 class TestNetworkingBasic(NetworkCase):
     def testBasic(self):
         b = self.browser
@@ -33,6 +33,10 @@ class TestNetworkingBasic(NetworkCase):
         if not m.ostree_image:
             # screenshot assumes running firewalld and absent virbr0 (in particular, *3* interfaces)
             m.execute("systemctl start firewalld")
+
+            # ensure PCP is on for pixel tests, so that we get the zoom/range selectors
+            if b.pixels_label:
+                m.execute("systemctl start pmlogger")
 
         self.login_and_go("/network")
         b.wait_visible("#networking")

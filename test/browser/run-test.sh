@@ -1,21 +1,28 @@
 #!/bin/sh
 set -eux
 
+PLAN="$1"
+
 cd "$SOURCE"
 
 . /etc/os-release
-test_optional=
-test_basic=
 
-if ls ../cockpit-appstream* 1> /dev/null 2>&1; then
-    test_optional=1
-else
-    test_basic=1
-fi
-
-if [ "$ID" = "fedora" ]; then
-    test_basic=1
-    test_optional=1
+# on Fedora we always test all packages;
+# on RHEL/CentOS 8 we have a split package, only test basic bits for "cockpit" and optional bits for "c-appstream"
+if [ "$PLATFORM_ID" = "platform:el8" ]; then
+    if ls ../cockpit-appstream* 1> /dev/null 2>&1; then
+        if [ "$PLAN" = "basic" ] || [ "$PLAN" = "network" ]; then
+            echo "SKIP: not running basic/network tests for cockpit-appstream"
+            echo 0 > "$LOGS/exitcode"
+            exit 0
+        fi
+    else
+        if [ "$PLAN" = "optional" ]; then
+            echo "SKIP: not running optional tests for split RHEL 8 cockpit"
+            echo 0 > "$LOGS/exitcode"
+            exit 0
+        fi
+    fi
 fi
 
 # tests need cockpit's bots/ libraries
@@ -27,15 +34,6 @@ if [ -d .git ]; then
 fi
 
 export TEST_OS="${ID}-${VERSION_ID/./-}"
-# HACK: upstream does not yet know about rawhide
-if [ "$TEST_OS" = "fedora-38" ]; then
-    export TEST_OS=fedora-36
-fi
-
-# HACK: 37 is beta
-if [ "$TEST_OS" = "fedora-37" ]; then
-    export TEST_OS=fedora-36
-fi
 
 if [ "${TEST_OS#centos-}" != "$TEST_OS" ]; then
     TEST_OS="${TEST_OS}-stream"
@@ -56,6 +54,11 @@ if [ "${TEST_OS#centos-8}" != "$TEST_OS" ]; then
     TEST_ALLOW_JOURNAL_MESSAGES="${TEST_ALLOW_JOURNAL_MESSAGES},couldn't create runtime dir: /run/user/1001: Permission denied"
 fi
 
+# HACK: https://github.com/systemd/systemd/issues/24150
+if [ "$ID" = "fedora" ]; then
+       TEST_ALLOW_JOURNAL_MESSAGES="${TEST_ALLOW_JOURNAL_MESSAGES},Journal file /var/log/journal/*/user-1000@*.journal corrupted, ignoring file .*"
+fi
+
 export TEST_ALLOW_JOURNAL_MESSAGES
 
 # We only have one VM and tests should take at most one hour. So run those tests which exercise external API
@@ -64,7 +67,7 @@ export TEST_ALLOW_JOURNAL_MESSAGES
 TESTS=""
 EXCLUDES=""
 RC=0
-if [ -n "$test_optional" ]; then
+if [ "$PLAN" = "optional" ]; then
     TESTS="$TESTS
            TestAutoUpdates
            TestUpdates
@@ -72,35 +75,43 @@ if [ -n "$test_optional" ]; then
            "
 
     # Testing Farm machines often have pending restarts/reboot
-    EXCLUDES="$EXCLUDES TestUpdates.testBasic TestUpdates.testFailServiceRestart"
+    EXCLUDES="$EXCLUDES TestUpdates.testBasic TestUpdates.testFailServiceRestart TestUpdates.testKpatch"
 
     # These don't test more external APIs
     EXCLUDES="$EXCLUDES
               TestAutoUpdates.testBasic
               TestAutoUpdates.testPrivilegeChange
 
+              TestStoragePackagesNFS.testNfsMissingPackages
+              TestStoragePartitions.testSizeSlider
+              TestStorageIgnored.testIgnored
+
               TestUpdates.testUnprivileged
               TestUpdates.testPackageKitCrash
               TestUpdates.testNoPackageKit
               TestUpdates.testInfoTruncation
               "
+
+    # RHEL test machines have a lot of junk mounted on /mnt
+    if [ "${TEST_OS#rhel-}" != "$TEST_OS" ]; then
+        EXCLUDES="$EXCLUDES
+            TestStorageNfs.testNfsBusy
+            TestStorageNfs.testNfsClient
+            TestStorageNfs.testNfsMountWithoutDiscovery
+            "
+    fi
 fi
 
-if [ -n "$test_basic" ]; then
+if [ "$PLAN" = "basic" ]; then
     # Don't run TestPages, TestPackages, and TestTerminal at all -- not testing external APIs
     TESTS="$TESTS
         TestAccounts
-        TestBonding
-        TestBridge
-        TestFirewall
         TestKdump
         TestJournal
         TestLogin
-        TestNetworking
         TestServices
         TestSOS
         TestSystemInfo
-        TestTeam
         TestTuned
         "
 
@@ -116,22 +127,17 @@ if [ -n "$test_basic" ]; then
               TestJournal.testAbrtSegv
               "
 
+    # no cockpit-tests package in RHEL 8
+    if [ "${TEST_OS#rhel-8}" != "$TEST_OS" ]; then
+        EXCLUDES="$EXCLUDES TestLogin.testSELinuxRestrictedUser"
+    fi
+
     # These don't test more external APIs
     EXCLUDES="$EXCLUDES
               TestAccounts.testAccountLogs
               TestAccounts.testExpire
               TestAccounts.testRootLogin
               TestAccounts.testUnprivileged
-
-              TestBonding.testActive
-              TestBonding.testAmbiguousMember
-              TestBonding.testNonDefaultSettings
-
-              TestFirewall.testAddCustomServices
-              TestFirewall.testNetworkingPage
-
-              TestNetworkingBasic.testIpHelper
-              TestNetworkingBasic.testNoService
 
               TestLogin.testConversation
               TestLogin.testExpired
@@ -142,10 +148,6 @@ if [ -n "$test_basic" ]; then
               TestLogin.testRaw
               TestLogin.testServer
               TestLogin.testUnsupportedBrowser
-
-              TestStoragePackagesNFS.testNfsMissingPackages
-              TestStoragePartitions.testSizeSlider
-              TestStorageIgnored.testIgnored
 
               TestSOS.testWithUrlRoot
               TestSOS.testCancel
@@ -168,19 +170,31 @@ if [ -n "$test_basic" ]; then
               TestServices.testResetFailed
               TestServices.testTransientUnits
               "
-
-    # HACK: https://bugzilla.redhat.com/show_bug.cgi?id=2058142
-    if [ "$TEST_OS" = "fedora-36" ]; then
-        EXCLUDES="$EXCLUDES TestSOS.testBasic"
-    fi
-
-    # Firefox 91 (currently in centos-8-stream and centos-9-stream)
-    # can't download files ending in ".gpg".
-    if rpmquery firefox | grep -q ^firefox-91; then
-        EXCLUDES="$EXCLUDES TestSOS.testBasic"
-    fi
-
 fi
+
+if [ "$PLAN" = "network" ]; then
+    TESTS="$TESTS
+        TestBonding
+        TestBridge
+        TestFirewall
+        TestNetworking
+        TestTeam
+        "
+
+    # These don't test more external APIs
+    EXCLUDES="$EXCLUDES
+              TestBonding.testActive
+              TestBonding.testAmbiguousMember
+              TestBonding.testNonDefaultSettings
+
+              TestFirewall.testAddCustomServices
+              TestFirewall.testNetworkingPage
+
+              TestNetworkingBasic.testIpHelper
+              TestNetworkingBasic.testNoService
+              "
+fi
+
 
 exclude_options=""
 for t in $EXCLUDES; do

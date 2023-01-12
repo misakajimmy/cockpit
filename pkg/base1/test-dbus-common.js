@@ -61,7 +61,8 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                     assert.ok(false, "should not be reached");
                 })
                 .fail(function(ex) {
-                    assert.equal(ex.name, "org.freedesktop.DBus.Error.Timeout");
+                    assert.ok(["org.freedesktop.DBus.Error.Timeout",
+                        "org.freedesktop.DBus.Error.NoReply"].indexOf(ex.name) >= 0);
                 })
                 .always(function() {
                     assert.equal(this.state(), "rejected", "call timed out");
@@ -142,7 +143,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("integer bounds", function (assert) {
+    QUnit.test.skipWithPybridge("integer bounds", function (assert) {
         assert.expect(35);
 
         const dbus = cockpit.dbus(bus_name, channel_options);
@@ -215,7 +216,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("variants", function (assert) {
+    QUnit.test.skipWithPybridge("variants", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -239,30 +240,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad variants", function (assert) {
-        const done = assert.async();
-        assert.expect(3);
-
-        const dbus = cockpit.dbus(bus_name, channel_options);
-        dbus.call("/otree/frobber", "com.redhat.Cockpit.DBusTests.Frobber",
-                  "TestAsv", [{
-                      one: "foo",
-                      two: "/bar",
-                      three: "assgit",
-                      four: 42,
-                      five: 1000.0
-                  }])
-                .fail(function(ex) {
-                    assert.equal(ex.name, "org.freedesktop.DBus.Error.InvalidArgs", "error name");
-                    assert.equal(ex.message, "Unexpected type 'string' in argument", "error message");
-                })
-                .always(function() {
-                    assert.equal(this.state(), "rejected", "should fail");
-                    done();
-                });
-    });
-
-    QUnit.test("bad variants", function (assert) {
+    QUnit.test.skipWithPybridge("bad variants", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -338,7 +316,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("call bad base64", function (assert) {
+    QUnit.test.skipWithPybridge("call bad base64", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -489,7 +467,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("empty base64", function (assert) {
+    QUnit.test.skipWithPybridge("empty base64", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -507,7 +485,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad object path", function (assert) {
+    QUnit.test.skipWithPybridge("bad object path", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -522,7 +500,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad interface name", function (assert) {
+    QUnit.test.skipWithPybridge("bad interface name", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -537,7 +515,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad method name", function (assert) {
+    QUnit.test.skipWithPybridge("bad method name", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -552,7 +530,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad flags", function (assert) {
+    QUnit.test.skipWithPybridge("bad flags", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -567,7 +545,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad types", function (assert) {
+    QUnit.test.skipWithPybridge("bad types", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -584,7 +562,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad type invalid", function (assert) {
+    QUnit.test.skipWithPybridge("bad type invalid", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -600,7 +578,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad dict type", function (assert) {
+    QUnit.test.skipWithPybridge("bad dict type", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -617,7 +595,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad object path", function (assert) {
+    QUnit.test.skipWithPybridge("bad object path", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -634,7 +612,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("bad signature", function (assert) {
+    QUnit.test.skipWithPybridge("bad signature", function (assert) {
         const done = assert.async();
         assert.expect(3);
 
@@ -700,10 +678,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                                      {
                                          FinallyNormalName: "There aint no place like home",
                                          ReadonlyProperty: "blah",
-                                         aay: [], ag: [], ao: [], as: [],
+                                         aay: [],
+                                         ag: [],
+                                         ao: [],
+                                         as: [],
                                          ay: "QUJDYWJjAA==",
-                                         b: false, d: 43, g: "", i: 0, n: 0,
-                                         o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                                         b: false,
+                                         d: 43,
+                                         g: "",
+                                         i: 0,
+                                         n: 0,
+                                         o: "/",
+                                         q: 0,
+                                         s: "",
+                                         t: 0,
+                                         u: 0,
+                                         x: 0,
                                          y: 42
                                      }, "correct data");
                     dbus.removeEventListener("notify", onnotify);
@@ -729,10 +719,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                           {
                               FinallyNormalName: "There aint no place like home",
                               ReadonlyProperty: "blah",
-                              aay: [], ag: [], ao: [], as: [],
+                              aay: [],
+                              ag: [],
+                              ao: [],
+                              as: [],
                               ay: "QUJDYWJjAA==",
-                              b: false, d: 43, g: "", i: 0, n: 0,
-                              o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                              b: false,
+                              d: 43,
+                              g: "",
+                              i: 0,
+                              n: 0,
+                              o: "/",
+                              q: 0,
+                              s: "",
+                              t: 0,
+                              u: 0,
+                              x: 0,
                               y: 42
                           }
                         }
@@ -759,10 +761,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                     "com.redhat.Cockpit.DBusTests.Frobber": {
                         FinallyNormalName: "There aint no place like home",
                         ReadonlyProperty: "blah",
-                        aay: [], ag: [], ao: [], as: [],
+                        aay: [],
+                        ag: [],
+                        ao: [],
+                        as: [],
                         ay: "QUJDYWJjAA==",
-                        b: false, d: 43, g: "", i: 0, n: 0,
-                        o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                        b: false,
+                        d: 43,
+                        g: "",
+                        i: 0,
+                        n: 0,
+                        o: "/",
+                        q: 0,
+                        s: "",
+                        t: 0,
+                        u: 0,
+                        x: 0,
                         y: 42
                     }
                 }
@@ -795,10 +809,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                                      {
                                          FinallyNormalName: "There aint no place like home",
                                          ReadonlyProperty: "blah",
-                                         aay: [], ag: [], ao: [], as: [],
+                                         aay: [],
+                                         ag: [],
+                                         ao: [],
+                                         as: [],
                                          ay: "QUJDYWJjAA==",
-                                         b: false, d: 43, g: "", i: 0, n: 0,
-                                         o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                                         b: false,
+                                         d: 43,
+                                         g: "",
+                                         i: 0,
+                                         n: 0,
+                                         o: "/",
+                                         q: 0,
+                                         s: "",
+                                         t: 0,
+                                         u: 0,
+                                         x: 0,
                                          y: 42
                                      }, "correct data");
                 })
@@ -827,10 +853,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                           {
                               FinallyNormalName: "There aint no place like home",
                               ReadonlyProperty: "blah",
-                              aay: [], ag: [], ao: [], as: [],
+                              aay: [],
+                              ag: [],
+                              ao: [],
+                              as: [],
                               ay: "QUJDYWJjAA==",
-                              b: false, d: 43, g: "", i: 0, n: 0,
-                              o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                              b: false,
+                              d: 43,
+                              g: "",
+                              i: 0,
+                              n: 0,
+                              o: "/",
+                              q: 0,
+                              s: "",
+                              t: 0,
+                              u: 0,
+                              x: 0,
                               y: 42
                           }
                         }
@@ -843,10 +881,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                                   {
                                       FinallyNormalName: "There aint no place like home",
                                       ReadonlyProperty: "blah",
-                                      aay: [], ag: [], ao: [], as: [],
+                                      aay: [],
+                                      ag: [],
+                                      ao: [],
+                                      as: [],
                                       ay: "QUJDYWJjAA==",
-                                      b: false, d: 43, g: "", i: 0, n: 0,
-                                      o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                                      b: false,
+                                      d: 43,
+                                      g: "",
+                                      i: 0,
+                                      n: 0,
+                                      o: "/",
+                                      q: 0,
+                                      s: "",
+                                      t: 0,
+                                      u: 0,
+                                      x: 0,
                                       y: 42
                                   },
                                         "com.redhat.Cockpit.DBusTests.Alpha": {}
@@ -860,10 +910,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                                       {
                                           FinallyNormalName: "There aint no place like home",
                                           ReadonlyProperty: "blah",
-                                          aay: [], ag: [], ao: [], as: [],
+                                          aay: [],
+                                          ag: [],
+                                          ao: [],
+                                          as: [],
                                           ay: "QUJDYWJjAA==",
-                                          b: false, d: 43, g: "", i: 0, n: 0,
-                                          o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                                          b: false,
+                                          d: 43,
+                                          g: "",
+                                          i: 0,
+                                          n: 0,
+                                          o: "/",
+                                          q: 0,
+                                          s: "",
+                                          t: 0,
+                                          u: 0,
+                                          x: 0,
                                           y: 42
                                       },
                                                     "com.redhat.Cockpit.DBusTests.Alpha": null
@@ -876,7 +938,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("path loop", function (assert) {
+    QUnit.test.skipWithPybridge("path loop", function (assert) {
         const done = assert.async();
         assert.expect(2);
 
@@ -911,7 +973,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 });
     });
 
-    QUnit.test("path signal", function (assert) {
+    QUnit.test.skipWithPybridge("path signal", function (assert) {
         const done = assert.async();
         assert.expect(4);
 
@@ -953,10 +1015,22 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
             assert.deepEqual(proxy.data, {
                 FinallyNormalName: "There aint no place like home",
                 ReadonlyProperty: "blah",
-                aay: [], ag: [], ao: [], as: [],
+                aay: [],
+                ag: [],
+                ao: [],
+                as: [],
                 ay: "QUJDYWJjAA==",
-                b: false, d: 43, g: "", i: 0, n: 0,
-                o: "/", q: 0, s: "", t: 0, u: 0, x: 0,
+                b: false,
+                d: 43,
+                g: "",
+                i: 0,
+                n: 0,
+                o: "/",
+                q: 0,
+                s: "",
+                t: 0,
+                u: 0,
+                x: 0,
                 y: 42
             }, "correct data");
 
@@ -1002,7 +1076,8 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
 
         proxy.call('NeverReturn', [], { timeout: 10 })
                 .fail(function (ex) {
-                    assert.equal(ex.name, "org.freedesktop.DBus.Error.Timeout");
+                    assert.ok(["org.freedesktop.DBus.Error.Timeout",
+                        "org.freedesktop.DBus.Error.NoReply"].indexOf(ex.name) >= 0);
                 })
                 .always(function() {
                     assert.equal(this.state(), "rejected", "call timed out");
@@ -1073,7 +1148,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
                 .always(function() {
                     assert.equal(this.state(), "resolved", "deleted stray objects");
 
-                    const proxies = dbus.proxies("com.redhat.Cockpit.DBusTests.Frobber");
+                    const proxies = dbus.proxies("com.redhat.Cockpit.DBusTests.Frobber", "/otree");
                     proxies.wait().always(function() {
                         let added;
                         proxies.addEventListener("added", function(event, proxy) {
@@ -1126,7 +1201,7 @@ export function common_dbus_tests(channel_options, bus_name) { // eslint-disable
 }
 
 export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-line no-unused-vars
-    QUnit.test("track name", function (assert) {
+    QUnit.test.skipWithPybridge("track name", function (assert) {
         const done = assert.async();
         assert.expect(4);
 
@@ -1148,7 +1223,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                     other.addEventListener("close", function(event, data) {
                         assert.strictEqual(data.problem, undefined, "no problem");
                         gone = true;
-                        if (released && gone)
+                        if (released)
                             done();
                     });
 
@@ -1162,7 +1237,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                                         .always(function() {
                                             assert.equal(this.state(), "resolved", "name released");
                                             released = true;
-                                            if (released && gone)
+                                            if (gone)
                                                 done();
                                         });
                             });
@@ -1209,7 +1284,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                 });
     });
 
-    QUnit.test("receive readable fd", function (assert) {
+    QUnit.test.skipWithPybridge("receive readable fd", function (assert) {
         const done = assert.async();
         assert.expect(4);
 
@@ -1235,7 +1310,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                 });
     });
 
-    QUnit.test("receive readable fd and ensure opening more than once fails", function (assert) {
+    QUnit.test.skipWithPybridge("receive readable fd and ensure opening more than once fails", function (assert) {
         const done = assert.async();
         assert.expect(7);
 
@@ -1264,7 +1339,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                 });
     });
 
-    QUnit.test("receive readable fd and ensure writing fails", function (assert) {
+    QUnit.test.skipWithPybridge("receive readable fd and ensure writing fails", function (assert) {
         const done = assert.async();
         assert.expect(6);
 
@@ -1292,7 +1367,7 @@ export function dbus_track_tests(channel_options, bus_name) { // eslint-disable-
                 });
     });
 
-    QUnit.test("receive writable fd", function (assert) {
+    QUnit.test.skipWithPybridge("receive writable fd", function (assert) {
         const done = assert.async();
         assert.expect(3);
 

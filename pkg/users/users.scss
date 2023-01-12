@@ -5,6 +5,8 @@
 @import "@patternfly/patternfly/utilities/Spacing/spacing.css";
 @import "global-variables.scss";
 @import "@patternfly/patternfly/components/DataList/data-list.scss";
+@import "@patternfly/patternfly/components/Toolbar/toolbar.scss";
+@import "@patternfly/patternfly/layouts/Flex/flex.scss";
 
 #account .pf-c-card {
   @extend .ct-card;
@@ -27,52 +29,8 @@
   padding: var(--pf-global--gutter);
 }
 
-#accounts-list {
-  --ct-account-pic-size: 3rem;
-}
-
-@media (max-width: 640px) {
-  #accounts-list {
-    --ct-account-pic-size: 0;
-  }
-}
-
-.cockpit-account {
-  display: grid;
-  grid-template-areas: "pic name"
-    "pic account";
-  grid-template-columns: var(--ct-account-pic-size) 1fr;
-  grid-gap: 0 0.25rem;
-  min-height: 4rem;
-  padding: 0.5rem;
-}
-
-.cockpit-account > .cockpit-account-pic {
-  font-size: var(--ct-account-pic-size);
-  color: #bebebe;
-  grid-area: pic;
-}
-
-.cockpit-account > .cockpit-account-real-name {
-  font-weight: bold;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  grid-area: name;
-}
-
-.cockpit-account > .cockpit-account-user-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  grid-area: account;
-  outline: none;
-  align-self: end;
-  display: flex;
-  justify-content: space-between;
-
-  > a {
-    margin-right: 0.5rem;
-  }
+.delete-resource-red {
+  color: var(--pf-global--danger-color--200);
 }
 
 #account-details div.checkbox:first-child {
@@ -81,107 +39,6 @@
 
 #account-details div.checkbox:last-child {
   margin-bottom: 0;
-}
-
-#account-pic {
-  background: #d3d7cf;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-#account-authorized-keys {
-  .pf-c-data-list__item {
-    // Align text with heading
-    --pf-c-data-list__item-row--PaddingLeft: var(--pf-global--spacer--lg);
-
-    // Align - buttons with + button
-    --pf-c-data-list__item-row--PaddingRight: var(--pf-global--spacer--md);
-
-    // Add a border to the top item
-    &:first-child {
-      border-top: var(--pf-c-data-list__item--BorderBottomWidth) solid var(--pf-c-data-list__item--BorderBottomColor);
-    }
-
-    // Remove a border from the bottom item
-    &:last-child {
-      border-bottom: none;
-    }
-  }
-
-  .pf-c-data-list__cell {
-    // Align to center (when stretched wide)
-    align-self: center;
-    // Allow cells to be wrappable
-    overflow-wrap: anywhere;
-
-    // Comment is user@hostname
-    &.comment {
-      // Grow, shrink, and try to be around 12rem (or more or less)
-      flex: 1 1 10rem;
-    }
-
-    &.fingerprint {
-      // Grow more, shrink, and try to be around 20rem (or more or less)
-      flex: 100 1 50%;
-    }
-  }
-
-  // Handle empty state
-  .no-keys {
-    display: block;
-    text-align: center;
-    padding: var(--pf-global--spacer--lg);
-  }
-}
-
-/* Use subgrid to properly align items, making the list act like a table  */
-@supports (grid-template-columns: subgrid) {
-  @media screen and (min-width: 512px) {
-    #account-authorized-keys-list {
-      display: grid;
-      // This template will apply to the subgrids too
-      grid-template-columns: minmax(8rem, auto) minmax(33%, 1fr) auto;
-
-      /* Bring the grid through all the children */
-      .pf-c-data-list__item,
-      .pf-c-data-list__item-row:not(.no-keys),
-      .pf-c-data-list__item-content {
-        display: grid;
-        grid-template-columns: subgrid;
-      }
-
-      /* Align children across all the grid */
-      .pf-c-data-list__item,
-      .pf-c-data-list__item-row {
-        grid-column: 1 / -1;
-      }
-
-      /* Put the wrapper for the items on the first two grid cells (leaving the actions on the third) */
-      .pf-c-data-list__item-content {
-        grid-column: 1 / -2;
-      }
-
-      /* Place comment and fingerprint on their cells */
-      .pf-c-data-list__cell {
-        &.comment {
-          grid-column: 1;
-        }
-
-        &.fingerprint {
-          grid-column: 2;
-        }
-      }
-    }
-  }
-}
-
-#account-authorized-keys-list {
-  border: none;
-  margin-bottom: 0;
-}
-
-.align-top {
-  vertical-align: top;
 }
 
 .size-text-ct {
@@ -218,4 +75,34 @@
 
 .outline-question-circle-icon {
   margin-left: var(--pf-global--spacer--sm);
+}
+
+.accounts-toolbar-header > .pf-c-toolbar__content-section {
+  row-gap: var(--pf-global--spacer--sm);
+}
+
+.dot {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+// Iterate through supported PF color names for light and dark modes
+@each $color in cyan gold {
+  .group-#{$color} {
+    background-color: var(--pf-global--palette--#{$color}-100);
+
+    .pf-theme-dark & {
+      background-color: var(--pf-global--palette--#{$color}-300);
+    }
+  }
+}
+// PF adapts this color properly across light and dark
+.group-grey {
+  background-color: var(--pf-global--BorderColor--100);
+}
+
+.group-more-btn {
+  font-size: var(--pf-global--FontSize--sm);
 }

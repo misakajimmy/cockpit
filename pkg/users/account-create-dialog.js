@@ -116,25 +116,34 @@ function validate_username(username, accounts) {
     return null;
 }
 
+function validate_real_name(real_name) {
+    if (!real_name)
+        return _("No real name specified");
+
+    const real_name_chars = Array.from(real_name);
+    if (real_name_chars.includes(':'))
+        return _("The full name must not contain colons.");
+}
+
 function suggest_username(realname) {
     function remove_diacritics(str) {
         const translate_table = {
-            a :  '[àáâãäå]',
-            ae:  'æ',
-            c :  '[čç]',
-            d :  'ď',
-            e :  '[èéêë]',
-            i :  '[íìïî]',
-            l :  '[ĺľ]',
-            n :  '[ňñ]',
-            o :  '[òóôõö]',
-            oe:  'œ',
-            r :  '[ŕř]',
-            s :  'š',
-            t :  'ť',
-            u :  '[ùúůûűü]',
-            y :  '[ýÿ]',
-            z :  'ž',
+            a: '[àáâãäå]',
+            ae: 'æ',
+            c: '[čç]',
+            d: 'ď',
+            e: '[èéêë]',
+            i: '[íìïî]',
+            l: '[ĺľ]',
+            n: '[ňñ]',
+            o: '[òóôõö]',
+            oe: 'œ',
+            r: '[ŕř]',
+            s: 'š',
+            t: 'ť',
+            u: '[ùúůûűü]',
+            y: '[ýÿ]',
+            z: 'ž',
         };
         for (const i in translate_table)
             str = str.replace(new RegExp(translate_table[i], 'g'), i);
@@ -203,8 +212,7 @@ export function account_create_dialog(accounts) {
     function validate(force, real_name, user_name, password, password_confirm) {
         const errs = { };
 
-        if (!real_name)
-            errors.real_name = _("No real name specified");
+        errs.real_name = validate_real_name(real_name);
 
         if (password != password_confirm)
             errs.password_confirm = _("The passwords do not match");
@@ -216,7 +224,7 @@ export function account_create_dialog(accounts) {
 
         return password_quality(password, force)
                 .catch(ex => {
-                    errs.password = (ex.message || ex.toString()).replace("\n", " ");
+                    errs.password = (ex.message || ex.toString()).replaceAll("\n", " ");
                 })
                 .then(() => {
                     errors = errs;

@@ -20,12 +20,19 @@
 import parent  # noqa: F401
 from packagelib import PackageCase
 from storagelib import StorageCase
-from testlib import skipImage, test_main
+from testlib import skipImage, todoPybridge, test_main
 
 
-# TODO: Arch Linux has Stratis packages, tests need adjustments
-@skipImage("No Stratis", "debian-stable", "debian-testing", "ubuntu-stable", "ubuntu-2204", "arch")
+@skipImage("No Stratis", "debian-stable", "debian-testing", "ubuntu-stable", "ubuntu-2204")
+@todoPybridge()
 class TestStorageStratis(StorageCase):
+    def setUp(self):
+        super().setUp()
+
+        if self.image == "arch":
+            # Arch Linux does not enable systemd units by default
+            self.machine.execute("systemctl enable --now stratisd")
+            self.addCleanup(self.machine.execute, "systemctl disable --now stratisd")
 
     def testBasic(self):
         m = self.machine
@@ -372,6 +379,7 @@ class TestStorageStratis(StorageCase):
 
 @skipImage("No Stratis", "debian-stable", "debian-testing", "ubuntu-stable", "ubuntu-2204", "arch")
 @skipImage("No Stratis on demand", "rhel-9-1", "rhel-8-7", "rhel-8-8")
+@todoPybridge()
 class TestStoragePackagesStratis(PackageCase, StorageCase):
 
     def testStratisOndemandInstallation(self):

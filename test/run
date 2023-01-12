@@ -7,6 +7,7 @@ set -eu
 
 tools/make-bots
 test/common/pixel-tests pull
+tools/webpack-jumpstart --partial || true
 
 TEST_SCENARIO=${TEST_SCENARIO:-verify}
 
@@ -25,9 +26,10 @@ case $TEST_SCENARIO in
         test/common/run-tests --jobs ${TEST_JOBS:-1} --test-dir test/verify --track-naughties
         ;;
     pybridge)
+        tools/systemd_ctypes
         test/image-prepare --verbose $TEST_OS
-        make -C tmp/build-dist/ cockpit-bridge.pyz
-        bots/image-customize -v --upload tmp/build-dist/cockpit-bridge.pyz:/usr/bin/cockpit-bridge $TEST_OS
+        python3 -m build --no-isolation --wheel --outdir tmp/wheel
+        bots/image-customize --verbose --no-network --install tmp/wheel/*.whl "${TEST_OS}"
         test/common/run-tests --jobs ${TEST_JOBS:-1} --test-dir test/verify --track-naughties
         ;;
     *)

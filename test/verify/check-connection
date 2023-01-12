@@ -21,9 +21,10 @@ import base64
 import time
 import os
 import subprocess
+import unittest
 
 import parent  # noqa: F401
-from testlib import MachineCase, TEST_DIR, nondestructive, skipBrowser, skipDistroPackage, skipImage, test_main, wait
+from testlib import MachineCase, TEST_DIR, nondestructive, skipBrowser, skipDistroPackage, skipImage, todoPybridge, test_main, wait
 
 
 @skipDistroPackage()
@@ -507,7 +508,7 @@ class TestConnection(MachineCase):
         # annoying due to the date format OpenSSL uses (which Python can't
         # trivially parse) and the question of locales
         expires = m.execute(f'date -d "$(openssl x509 -enddate -noout < {selfsign} | cut -f2 -d=)" +%s')
-        self.assertTrue(int(expires) > time.time() + 99 * 365 * 24 * 60 * 60)
+        self.assertGreater(int(expires), time.time() + 99 * 365 * 24 * 60 * 60)
 
         # Put things back: avoid problematic multiple invocations of .sed_file()
         m.execute(f'sed -i s/DAYS=36500/DAYS=395/ {helper}')
@@ -522,7 +523,7 @@ class TestConnection(MachineCase):
         # Check that the expiry is less than 420 days
         # See https://github.com/sgallagher/sscg/pull/28 for why 420
         expires = m.execute(f'date -d "$(openssl x509 -enddate -noout < {selfsign} | cut -f2 -d=)" +%s')
-        self.assertTrue(int(expires) < time.time() + 420 * 24 * 60 * 60)
+        self.assertLess(int(expires), time.time() + 420 * 24 * 60 * 60)
 
         # Run ensure again and make sure we *don't* get a new certificate
         m.execute('touch /tmp/timestamp')
@@ -595,14 +596,18 @@ class TestConnection(MachineCase):
         output = m.execute('curl -k --unix /run/cockpit/sock https://dummy 2>&1 || true')
         self.assertIn('Loading...', output)
 
-        output = m.execute('curl -k https://localhost:9090 2>&1 || true')
-        self.assertIn('Connection refused', output)
+        output = m.execute('curl -k https://localhost:9090 2>/dev/null || echo $?')
+        self.assertIn('7', output.strip())
 
         self.allow_journal_messages(".*Peer failed to perform TLS handshake")
 
     @skipImage("Can't remove/upgrade packages on OSTree", "fedora-coreos")
     def testWsPackage(self):
         m = self.machine
+
+        # On RHEL-8 SSH allows password root login by default, so Cockpit does too.
+        ROOT_LOGIN_ENABLED = ['rhel-8', 'centos-8']
+        root_login_disallowed = not any(m.image.startswith(img) for img in ROOT_LOGIN_ENABLED)
 
         if m.image.startswith("debian") or m.image.startswith("ubuntu"):
             # clean up debug symbols, they get in the way of upgrading
@@ -631,14 +636,21 @@ class TestConnection(MachineCase):
             else:
                 m.execute("rpm --erase cockpit cockpit-ws")
 
-        # upgrade from distro version (our images have cockpit-ws preinstalled) sets up dynamic motd/issue symlink
+        # clean install sets up dynamic motd/issue symlink and pam disallowed users.
         self.assertIn('Activate the web console', m.execute("cat /etc/motd.d/cockpit"))
         self.assertIn('Activate the web console', m.execute("cat /etc/issue.d/cockpit.issue"))
+        if root_login_disallowed:
+            self.assertIn('root', m.execute("cat /etc/cockpit/disallowed-users"))
+        # remove disallowed-users to simulate an upgrade where we did not have this file yet.
+        m.execute("rm /etc/cockpit/disallowed-users")
 
         # package upgrade keeps them
         install()
         self.assertIn('Activate the web console', m.execute("cat /etc/motd.d/cockpit"))
         self.assertIn('Activate the web console', m.execute("cat /etc/issue.d/cockpit.issue"))
+        # disallowed-users should not exists now as this is an upgrade
+        m.execute("test ! -e /etc/cockpit/disallowed-users")
+        m.execute("echo 'root' > /etc/cockpit/disallowed-users")
 
         # HACK: On Arch Linux the symlink is overwritten, bug?
         if m.image != "arch":
@@ -652,12 +664,15 @@ class TestConnection(MachineCase):
         remove()
         m.execute("test ! -e /etc/motd.d/cockpit")
         m.execute("test ! -e /etc/issue.d/cockpit.issue")
+        m.execute("test ! -e /etc/cockpit/disallowed-users")
 
         # fresh install (most of our test images have cockpit-ws preinstalled, so the first test above does not cover that)
         install()
         # verify that we installed relative links in the new package
         self.assertEqual(m.execute("readlink /etc/motd.d/cockpit").strip(), "../../run/cockpit/motd")
         self.assertEqual(m.execute("readlink /etc/issue.d/cockpit.issue").strip(), "../../run/cockpit/motd")
+        if root_login_disallowed:
+            self.assertIn('root', m.execute("cat /etc/cockpit/disallowed-users"))
 
     @skipImage("OSTree doesn't have cockpit-ws", "fedora-coreos")
     @nondestructive
@@ -685,8 +700,8 @@ class TestConnection(MachineCase):
         # The port may not be available immediately, so wait for it
         wait(lambda: 'A Custom Title' in m.curl('-k', 'https://localhost:9000/'))
 
-        output = m.execute('curl -s -S -k https://172.27.0.15:9000/ 2>&1 || true')
-        self.assertIn('Connection refused', output)
+        output = m.execute('curl -s -S -k https://172.27.0.15:9000/ 2>&1 || echo $?')
+        self.assertIn('7', output.strip())
 
         # Large requests are processed correctly with plain HTTP
         self.assertIn('A Custom Title', m.curl('http://localhost:9000/', headers=large_headers))
@@ -732,12 +747,13 @@ class TestConnection(MachineCase):
         self.assertIn("HTTP/1.1 404 Not Found\r\n", headers)
 
     @skipImage("ssh root login not allowed", "fedora-coreos")
+    @unittest.skipIf(os.getenv("TEST_SCENARIO") == "pybridge", "wedges up VM too hard, and crashes hard")
     @nondestructive
     def testFlowControl(self):
         m = self.machine
         b = self.browser
 
-        self.login_and_go("/playground/speed", user="root")
+        self.login_and_go("/playground/speed", user="root", enable_root_login=True)
 
         # Check the speed playground page
         b.switch_to_top()
@@ -797,6 +813,7 @@ export XDG_CONFIG_DIRS=/usr/local
 
     @skipImage("OSTree doesn't have cockpit-ws", "fedora-coreos")
     @skipImage("Kernel does not allow user namespaces", "debian-stable", "debian-testing")
+    @todoPybridge()
     def testCockpitDesktop(self):
         m = self.machine
 
@@ -1081,6 +1098,9 @@ ProtocolHeader = X-Forwarded-Proto
             b.set_val("#login-password-input", "foobar")
             b.click('#login-button')
         b.wait_visible('#content')
+        # Verify that the urlRoot is applied to links in the navbar.
+        b.wait_visible(f'#host-apps a[href="{urlroot}/system"]')
+
         if login:
             # check that we show up in the system logs from the browser's IP, not the proxy's
             self.assertIn('(172.27.0.2)', self.machine.execute('who'))

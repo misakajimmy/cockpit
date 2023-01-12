@@ -18,7 +18,7 @@
  */
 
 import cockpit from 'cockpit';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { superuser } from "superuser";
 import { apply_modal_dialog } from "cockpit-components-dialog.jsx";
 
@@ -27,26 +27,24 @@ import {
     Card, CardBody, CardHeader, CardTitle, CardActions,
     EmptyState, EmptyStateVariant, EmptyStateIcon, EmptyStateSecondaryActions,
     Flex,
+    HelperText, HelperTextItem,
+    Label, LabelGroup,
     Page, PageSection,
-    Gallery, Text, TextVariants, Breadcrumb, BreadcrumbItem,
+    Gallery, Select, SelectOption, SelectVariant, Text, TextVariants, Breadcrumb, BreadcrumbItem,
     Form, FormGroup, TextInput,
+    Spinner,
     Title, Popover
 } from '@patternfly/react-core';
-import { ExclamationCircleIcon, HelpIcon } from '@patternfly/react-icons';
+import { ExclamationCircleIcon, HelpIcon, UndoIcon } from '@patternfly/react-icons';
 import { show_unexpected_error } from "./dialog-utils.js";
 import { delete_account_dialog } from "./delete-account-dialog.js";
 import { account_expiration_dialog, password_expiration_dialog } from "./expiration-dialogs.js";
 import { set_password_dialog, reset_password_dialog } from "./password-dialogs.js";
-import { AccountRoles } from "./account-roles.js";
 import { AccountLogs } from "./account-logs-panel.jsx";
 import { AuthorizedKeys } from "./authorized-keys-panel.js";
 import * as timeformat from "timeformat.js";
 
 const _ = cockpit.gettext;
-
-function log_unexpected_error(error) {
-    console.warn("Unexpected error", error);
-}
 
 function get_locked(name) {
     return cockpit.spawn(["/usr/bin/passwd", "-S", name], { environ: ["LC_ALL=C"], superuser: "require" })
@@ -56,34 +54,6 @@ function get_locked(name) {
                 // libuser uses "LK", shadow-utils use "L".
                 return status && (status == "LK" || status == "L");
             });
-}
-
-function get_logged(name) {
-    return cockpit.spawn(["/usr/bin/w", "-sh", name])
-            .then(content => content.length > 0 ? { currently: true } : get_last_login(name))
-            .catch(log_unexpected_error);
-}
-
-function get_last_login(name) {
-    function parse_last_login(data) {
-        const line = data.split('\n')[1]; // throw away header
-        if (!line || line.length === 0 || line.indexOf('**Never logged in**') > -1)
-            return null;
-
-        // line looks like this: admin            web cons ::ffff:172.27.0. Tue Mar 23 14:49:04 +0000 2021
-        // or like this:         admin            web cons ::ffff:172.27.0. Thu Apr  1 08:58:51 +0000 2021
-        // this is impossible to parse with Date() (e.g. Firefox does not work with all time zones), so call `date` to parse it
-        const date_fields = line.split(/ +/).slice(-5);
-
-        return cockpit.spawn(["date", "+%s", "-d", date_fields.join(' ')], { environ: ["LC_ALL=C"], err: "out" })
-                .then(out => parseInt(out) * 1000)
-                .catch(e => console.warn(`Failed to parse date from lastlog line '${line}': ${e.toString()}`));
-    }
-
-    return cockpit.spawn(["/usr/bin/lastlog", "-u", name], { environ: ["LC_ALL=C"] })
-            .then(data => parse_last_login(data))
-            .then(timestamp => ({ currently: false, last: timestamp }))
-            .catch(() => ({ currently: false, last: null }));
 }
 
 function get_expire(name) {
@@ -130,25 +100,15 @@ function get_expire(name) {
             .then(parse_expire);
 }
 
-function get_details(name) {
-    return Promise.all([get_logged(name), get_locked(name), get_expire(name)]).then(values => {
-        return {
-            logged: values[0],
-            locked: values[1],
-            expiration: values[2]
-        };
-    });
-}
-
 export function AccountDetails({ accounts, groups, shadow, current_user, user }) {
-    const [details, setDetails] = useState(null);
+    const [expiration, setExpiration] = useState(null);
     useEffect(() => {
-        get_details(user).then(setDetails);
+        get_expire(user).then(setExpiration);
 
         // Watch `/var/run/utmp` to register when user logs in or out
         const handle = cockpit.file("/var/run/utmp", { superuser: "try", binary: true });
         handle.watch(() => {
-            get_details(user).then(setDetails);
+            get_expire(user).then(setExpiration);
         });
         return handle.close;
     }, [user, accounts, shadow]);
@@ -210,9 +170,20 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
         cockpit.spawn(["/usr/bin/loginctl", "terminate-user", user],
                       { superuser: "try", err: "message" })
                 .then(() => {
-                    get_details(user).then(setDetails);
+                    get_expire(user).then(setExpiration);
                 })
                 .catch(show_unexpected_error);
+    }
+
+    if (!accounts.length) {
+        return (
+            <EmptyState variant={EmptyStateVariant.small}>
+                <Spinner isSVG size="xl" />
+                <Title headingLevel="h1" size="lg">
+                    {_("Loading...")}
+                </Title>
+            </EmptyState>
+        );
     }
 
     const account = accounts.find(acc => acc.name == user);
@@ -233,7 +204,7 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
         );
     }
 
-    if (!details)
+    if (!expiration)
         return null;
 
     const self_mod_allowed = (user == current_user || !!superuser.allowed);
@@ -245,12 +216,12 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
         title_name = account.name;
 
     let last_login;
-    if (details.logged.currently)
+    if (account.loggedIn)
         last_login = _("Logged in");
-    else if (!details.logged.last)
+    else if (!account.lastLogin)
         last_login = _("Never");
     else
-        last_login = timeformat.dateTime(new Date(details.logged.last));
+        last_login = timeformat.dateTime(new Date(account.lastLogin));
 
     return (
         <Page groupProps={{ sticky: 'top' }}
@@ -261,7 +232,7 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                       <BreadcrumbItem to="#/">{_("Accounts")}</BreadcrumbItem>
                       <BreadcrumbItem isActive>{title_name}</BreadcrumbItem>
                   </Breadcrumb>}>
-            <PageSection className="ct-pagesection-mobile">
+            <PageSection>
                 <Gallery hasGutter>
                     <Card className="account-details" id="account-details">
                         <CardHeader>
@@ -269,7 +240,7 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                             { superuser.allowed &&
                             <CardActions>
                                 <Button variant="secondary" onClick={() => logout_account()} id="account-logout"
-                                  isDisabled={!details.logged.currently || account.uid == 0}>
+                                  isDisabled={!account.loggedIn || account.uid == 0}>
                                     {_("Terminate session")}
                                 </Button>
                                 { "\n" }
@@ -293,22 +264,13 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                                                          }
                                                      }}
                                                      onChange={value => set_edited_real_name(value)}
-                                                     onBlur={event => change_real_name(event)} />
+                                                     onBlur={() => change_real_name()} />
                                         : <output id="account-real-name">{account.gecos}</output>}
                                 </FormGroup>
                                 <FormGroup fieldId="account-user-name" hasNoPaddingTop label={_("User name")}>
                                     <output id="account-user-name">{account.name}</output>
                                 </FormGroup>
-                                { account.uid !== 0 &&
-                                <FormGroup fieldId="account-roles" isInline label={_("Roles")}>
-                                    <div id="account-roles">
-                                        <div id="account-change-roles-roles">
-                                            <AccountRoles account={account} groups={groups}
-                                                currently_logged_in={details.logged.currently} />
-                                        </div>
-                                    </div>
-                                </FormGroup>
-                                }
+                                <AccountGroupsSelect key={account.name} loggedIn={account.loggedIn} name={account.name} groups={groups} />
                                 <FormGroup fieldId="account-last-login" hasNoPaddingTop label={_("Last login")}>
                                     <output id="account-last-login">{last_login}</output>
                                 </FormGroup>
@@ -318,7 +280,7 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                                             <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
                                                 <Checkbox id="account-locked"
                                                           isDisabled={!superuser.allowed || edited_locked != null || user == current_user}
-                                                          isChecked={edited_locked != null ? edited_locked : details.locked}
+                                                          isChecked={edited_locked != null ? edited_locked : account.isLocked}
                                                           onChange={checked => change_locked(checked)}
                                                           label={_("Disallow interactive password")} />
 
@@ -330,9 +292,9 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                                         </div>
                                         <Flex flex={{ default: 'inlineFlex' }}>
                                             <span id="account-expiration-text">
-                                                {details.expiration.account_text}
+                                                {expiration.account_text}
                                             </span>
-                                            <Button onClick={() => account_expiration_dialog(account, details.expiration.account_date)}
+                                            <Button onClick={() => account_expiration_dialog(account, expiration.account_date)}
                                                     isDisabled={!superuser.allowed}
                                                     variant="link"
                                                     isInline
@@ -362,9 +324,9 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
                                         </div>
                                         <Flex flex={{ default: 'inlineFlex' }}>
                                             <span id="password-expiration-text">
-                                                {details.expiration.password_text}
+                                                {expiration.password_text}
                                             </span>
-                                            <Button onClick={() => password_expiration_dialog(account, details.expiration.password_days)}
+                                            <Button onClick={() => password_expiration_dialog(account, expiration.password_days)}
                                                     isDisabled={!superuser.allowed}
                                                     variant="link"
                                                     isInline
@@ -385,3 +347,126 @@ export function AccountDetails({ accounts, groups, shadow, current_user, user })
         </Page>
     );
 }
+
+export const AccountGroupsSelect = ({ name, loggedIn, groups, setError }) => {
+    const [isOpenGroup, setIsOpenGroup] = useState(false);
+    const [selected, setSelected] = useState();
+    const [primaryGroupName, setPrimaryGroupName] = useState();
+    const [history, setHistory] = useState([]);
+    const previousValue = useRef(null);
+
+    useEffect(() => {
+        const usedGroups = groups.filter(group => group.userlist.includes(name));
+        const primaryGroup = groups.find(group => group.userlistPrimary.includes(name));
+        const _primaryGroupName = primaryGroup ? primaryGroup.name : undefined;
+        const _selected = usedGroups.map(group => group.name);
+        if (primaryGroup)
+            _selected.push(_primaryGroupName);
+
+        previousValue.current = _selected;
+        setSelected(_selected);
+        setPrimaryGroupName(_primaryGroupName);
+    }, [groups, setSelected, name, previousValue]);
+
+    const undoGroupChanges = () => {
+        const undoItem = history[history.length - 1];
+        if (undoItem.type === 'added') {
+            removeGroup(undoItem.name, true).then(() => setHistory(history.slice(0, -1)));
+        } else if (undoItem.type === 'removed') {
+            addGroup(undoItem.name, true).then(() => setHistory(history.slice(0, -1)));
+        }
+    };
+
+    const removeGroup = (group, isUndo) => {
+        if (!isUndo)
+            setHistory([...history, { type: 'removed', name: group }]);
+
+        return cockpit.spawn(["/usr/bin/gpasswd", "-d", name, group], { superuser: "require", err: "message" })
+                .then(() => {
+                    setSelected(selected.filter(item => item !== group));
+                    setIsOpenGroup(false);
+                }, error => {
+                    show_unexpected_error(error);
+                });
+    };
+
+    const addGroup = (group, isUndo) => {
+        if (!isUndo)
+            setHistory([...history, { type: 'added', name: group }]);
+
+        return cockpit.spawn(["/usr/bin/gpasswd", "-a", name, group], { superuser: "require", err: "message" })
+                .then(() => {
+                    setSelected([...selected, group]);
+                    setIsOpenGroup(false);
+                }, error => {
+                    show_unexpected_error(error);
+                });
+    };
+
+    const onSelectGroup = (event, selection) => {
+        if (selected.includes(selection)) {
+            removeGroup(selection);
+        } else {
+            addGroup(selection);
+        }
+    };
+
+    const chipGroupComponent = () => {
+        return (
+            <LabelGroup numLabels={10}>
+                {(selected || []).map((currentLabel, index) => {
+                    const optional = currentLabel !== primaryGroupName && superuser.allowed ? { onClose: () => removeGroup(currentLabel) } : {};
+
+                    return (
+                        <Label key={currentLabel}
+                               color={groups.find(group => group.name === currentLabel).isAdmin ? "gold" : "cyan"}
+                               {...optional}
+                        >
+                            {currentLabel}
+                        </Label>
+                    );
+                })}
+            </LabelGroup>
+        );
+    };
+
+    return (
+        <FormGroup
+            fieldId="account-groups"
+            helperText={
+                (history.length > 0)
+                    ? <HelperText className="pf-c-form__helper-text">
+                        <Flex>
+                            {loggedIn && <HelperTextItem id="account-groups-helper" variant="warning">{_("The user must log out and log back in for the new configuration to take effect.")}</HelperTextItem>}
+                            {history.length > 0 && <Button variant="link" id="group-undo-btn" isInline icon={<UndoIcon />} onClick={undoGroupChanges}>{_("Undo")}</Button>}
+                        </Flex>
+                    </HelperText>
+                    : ''
+            }
+            id="account-groups-form-group"
+            label={_("Groups")}
+            validated={history.length > 0 ? "warning" : "default"}
+        >
+            {superuser.allowed
+                ? <Select
+                   chipGroupComponent={chipGroupComponent()}
+                   isDisabled={!superuser.allowed}
+                   isOpen={isOpenGroup}
+                   onSelect={onSelectGroup}
+                   onToggle={setIsOpenGroup}
+                   selections={selected}
+                   toggleId="account-groups"
+                   variant={SelectVariant.typeaheadMulti}
+                >
+                    {groups.map((option, index) => (
+                        <SelectOption
+                            isDisabled={option.name == primaryGroupName}
+                            key={index}
+                            value={option.name}
+                        />
+                    ))}
+                </Select>
+                : chipGroupComponent()}
+        </FormGroup>
+    );
+};

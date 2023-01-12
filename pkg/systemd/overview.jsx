@@ -19,10 +19,11 @@
 
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import 'polyfills';
+import 'cockpit-dark-theme'; // once per page
 import cockpit from "cockpit";
 
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from "react-dom/client";
 import {
     Page, PageSection, PageSectionVariants,
     Gallery,
@@ -118,20 +119,21 @@ class OverviewPage extends React.Component {
         if (this.state.privileged)
             headerActions = (
                 <Dropdown onSelect={() => this.setState({ actionIsOpen: true })}
-                          toggle={
-                              <DropdownToggle
+                    toggle={
+                        <DropdownToggle
                             splitButtonItems={[
-                                <DropdownToggleAction id='reboot-button' variant="secondary"
-                                                      key='reboot-button'
-                                                      onClick={() => Dialogs.show(<ShutdownModal />)}>
+                                <DropdownToggleAction id='reboot-button'
+                                    key='reboot-button'
+                                    onClick={() => Dialogs.show(<ShutdownModal />)}>
                                     {_("Reboot")}
                                 </DropdownToggleAction>
                             ]}
+                            toggleVariant="secondary"
                             splitButtonVariant="action"
                             onToggle={isOpen => this.setState({ actionIsOpen: isOpen })}
                             id="shutdown-group"
-                              />
-                          }
+                        />
+                    }
                     isOpen={actionIsOpen}
                     position={DropdownPosition.right}
                     dropdownItems={dropdownItems}
@@ -144,10 +146,10 @@ class OverviewPage extends React.Component {
 
         return (
             <Page>
-                <PageSection variant={PageSectionVariants.light} padding={{ default: 'noPadding' }} className="ct-pagesection-mobile">
+                <PageSection variant={PageSectionVariants.light} padding={{ default: 'noPadding' }}>
                     <SuperuserAlert />
                 </PageSection>
-                <PageSection variant={PageSectionVariants.light} className='ct-overview-header'>
+                <PageSection variant={PageSectionVariants.light} className='ct-overview-header' padding={{ default: 'padding' }}>
                     <div className='ct-overview-header-hostname'>
                         <h1>
                             {this.hostname_text()}
@@ -162,7 +164,7 @@ class OverviewPage extends React.Component {
                         { headerActions }
                     </div>
                 </PageSection>
-                <PageSection variant={PageSectionVariants.default} className="ct-pagesection-mobile">
+                <PageSection variant={PageSectionVariants.default}>
                     <Gallery className='ct-system-overview' hasGutter>
                         <MotdCard />
                         <HealthCard />
@@ -178,7 +180,8 @@ class OverviewPage extends React.Component {
 
 function init() {
     cockpit.translate();
-    ReactDOM.render(<WithDialogs><OverviewPage /></WithDialogs>, document.getElementById("overview"));
+    const root = createRoot(document.getElementById("overview"));
+    root.render(<WithDialogs><OverviewPage /></WithDialogs>);
 }
 
 document.addEventListener("DOMContentLoaded", init);

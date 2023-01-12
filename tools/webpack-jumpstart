@@ -40,7 +40,7 @@ done
 
 [ -n "${quiet}" ] || set -x
 
-if [ -e dist -a -z "${force}" ]; then
+if [ -e dist ] && [ -z "${force}" ]; then
     echo "jumpstart: dist/ already exists, skipping" >&2
     exit 1
 fi
@@ -100,8 +100,12 @@ if test -n "${partial}"; then
     # fetch the available commits, then iterate our history looking for the first match
     available="$(git_cache ls-remote origin 'refs/tags/sha-*' | cut -f2 -d-)"
     for commit in $(git log -n 100 --format=%H); do
-        if [ "${available%${commit}*}" != "${available}" ]; then
+        if [ "${available%"${commit}"*}" != "${available}" ]; then
             tag="sha-${commit}"
+            break
+        fi
+        if git show --oneline --name-only "$commit" | grep -q '^node_modules'; then
+            echo "commit $commit changes node_modules" >&2
             break
         fi
     done
@@ -128,7 +132,7 @@ for try in $(seq 50 -1 0); do
     if fetch_to_cache tag "${tag}"; then
         break
     fi
-    if [ -z "${wait}" -o "$try" = '0' ]; then
+    if [ -z "${wait}" ] || [ "$try" = '0' ]; then
         exit 1
     fi
     message WAIT 30s
@@ -150,7 +154,7 @@ fi
 
 target_tree="$(cat_from_cache "${tag}" tree)"
 changed_files="$(git diff --name-only "${target_tree}")"
-if [ -n "${changed_files}" -a -z "${partial}" ]; then
+if [ -n "${changed_files}" ] && [ -z "${partial}" ]; then
     if [ -n "${rebase-}" ]; then
         echo "Internal error: even after rebase, don't have the correct tree" >&2
     else
@@ -161,7 +165,7 @@ fi
 
 tools/node-modules make_package_lock_json
 
-if [ -d dist -a -n "${force}" ]; then
+if [ -d dist ] && [ -n "${force}" ]; then
     message 'REMOVE' dist
     rm -rf dist
 fi
@@ -170,9 +174,9 @@ unpack_from_cache "${tag}"
 
 # "${changed_files}" is empty unless --partial was given
 for file in ${changed_files}; do
-    # don't touch files that have nothing to do with webpack
-    if grep -q -F ${file} dist/*/Makefile.deps; then
-        message TOUCH "${file}"
-        touch "${file}"
-    fi
+    # remove any webpacks that mention this file.  `grep -s` in case there aren't any left.
+    grep -sl "${file}" dist/*/Makefile.deps | cut -f2 -d/ | while read -r webpack; do
+        message REMOVE "dist/${webpack}"
+        rm -rf "dist/${webpack}"
+    done
 done

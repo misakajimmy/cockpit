@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html class="pf-theme-dark">
 
 <head>
   <title>Loading...</title>
@@ -38,6 +38,37 @@
       <h2 id="login-error-message" class="pf-c-alert__title">
         <span class="noscript" translate>Please enable JavaScript to use the Web Console.</span>
       </h2>
+    </div>
+
+    <div class="unsupported-browser" id="unsupported-browser" hidden>
+      <h2 class="unsupported-browser-heading" translate>A modern browser is required for security, reliability, and performance.</h2>
+      <div class="browser-recommendations">
+        <div class="browser-download">
+          <h3 translate>Download a new browser for free</h3>
+          <ul>
+            <li><a href="https://firefox.com/">Mozilla Firefox</a> / Linux, Windows, macOS</li>
+            <li><a href="https://www.google.com/chrome/">Google Chrome</a> / Linux, Windows, macOS</li>
+          </ul>
+        </div>
+        <div class="browser-bundled">
+          <h3 translate>Or use a bundled browser</h3>
+          <ul>
+            <li><a href="https://www.microsoft.com/">Microsoft Edge</a> / Windows</li>
+            <li><a href="https://www.apple.com/safari/">Apple Safari</a> / macOS</li>
+          </ul>
+        </div>
+      </div>
+      <details id="login-override">
+        <summary class="pf-c-expandable-section">
+          <svg height="16" width="16" viewBox="0 0 16 16" id="option-caret" class="caret caret-right" aria-hidden="true">
+            <polygon fill="#ffffff" points="4,0 4,14 12,7"></polygon>
+          </svg>
+          <span id="show-other-login-options-text" translate>
+            Bypass browser check
+          </span>
+        </summary>
+        <div id="login-override-content"></div>
+      </details>
     </div>
 
     <div id="info-group" class="pf-c-alert pf-m-info pf-m-inline dialog-error" aria-label="inline danger alert" hidden>
@@ -127,26 +158,6 @@
     <div id="login-fatal" hidden>
       <div id="login-fatal-message"></div>
       <a id="login-again" class="pf-c-button pf-m-primary" href="#" translate hidden>Try again</a>
-    </div>
-
-    <div class="unsupported-browser" id="unsupported-browser" hidden>
-      <h2 class="unsupported-browser-heading" translate>A modern browser is required for security, reliability, and performance.</h2>
-      <div class="browser-recommendations">
-        <div class="browser-download">
-          <h3 translate>Download a new browser for free</h3>
-          <ul>
-            <li><a href="https://firefox.com/">Mozilla Firefox</a> / Linux, Windows, macOS</li>
-            <li><a href="https://www.google.com/chrome/">Google Chrome</a> / Linux, Windows, macOS</li>
-          </ul>
-        </div>
-        <div class="browser-bundled">
-          <h3 translate>Or use a bundled browser</h3>
-          <ul>
-            <li><a href="https://www.microsoft.com/">Microsoft Edge</a> / Windows</li>
-            <li><a href="https://www.apple.com/safari/">Apple Safari</a> / macOS</li>
-          </ul>
-        </div>
-      </div>
     </div>
   </div>
 

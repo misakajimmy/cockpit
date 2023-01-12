@@ -10,13 +10,13 @@ jobs:
           - { make: 'check-memory', cc: 'gcc', tag: 'latest' }
           - { make: 'distcheck', cc: 'clang', tag: 'latest' }
           - { make: 'distcheck', cc: 'gcc', tag: 'i386' }
-          - { make: 'pycheck', cc: 'gcc', tag: 'latest', network: '--network' }
+          - { make: 'pytest-cov', cc: 'gcc', tag: 'latest' }
           - { make: 'check', cc: 'gcc', tag: 'latest' }
       fail-fast: false
     timeout-minutes: 60
     steps:
       - name: Clone repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           # need this to also fetch tags
           fetch-depth: 0
@@ -34,10 +34,12 @@ jobs:
 
       - name: Run unit-tests container
         timeout-minutes: 30
+        # HACK: -gdwarf-4 is for clang: https://bugs.kde.org/show_bug.cgi?id=452758
         run: |
           containers/unit-tests/start \
               --verbose \
-              ${{ matrix.startarg.network }} \
+              --submodule=modules/systemd_ctypes \
+              --env=FORCE_COLOR=1 \
               --env=CC='${{ matrix.startarg.cc }}' \
               --env=CFLAGS='-O2 -gdwarf-4' \
               --image-tag='${{ matrix.startarg.tag }}' \

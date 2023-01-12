@@ -143,9 +143,9 @@ export function validate_lvm2_name(name) {
 
 export function validate_fsys_label(label, type) {
     const fs_label_max = {
-        xfs:   12,
-        ext4:  16,
-        vfat:  11,
+        xfs: 12,
+        ext4: 16,
+        vfat: 11,
         ntfs: 128,
     };
 
@@ -352,7 +352,9 @@ export function get_partitions(client, block) {
             append_free_space(last_end, start - last_end);
             if (is_container) {
                 result.push({
-                    type: 'container', block: block, size: size,
+                    type: 'container',
+                    block: block,
+                    size: size,
                     partitions: process_level(level + 1, start, size)
                 });
             } else {
@@ -405,11 +407,16 @@ export function get_available_spaces(client) {
             return !!client.legacy_vdo_overlay.find_by_backing_block(block);
         }
 
+        function is_swap() {
+            return !!block && client.blocks_swap[path];
+        }
+
         return (!block.HintIgnore &&
                 block.Size > 0 &&
                 !has_fs_label() &&
                 !is_mpath_member() &&
                 !is_vdo_backing_dev() &&
+                !is_swap() &&
                 !block_ptable &&
                 !(block_part && block_part.IsContainer));
     }
@@ -434,7 +441,10 @@ export function get_available_spaces(client) {
                 link_parts = get_block_link_parts(client, block.path);
                 text = cockpit.format(link_parts.format, link_parts.link);
                 spaces.push({
-                    type: 'free', block: block, start: p.start, size: p.size,
+                    type: 'free',
+                    block: block,
+                    start: p.start,
+                    size: p.size,
                     desc: cockpit.format(_("unpartitioned space on $0"), text)
                 });
             }
@@ -736,7 +746,6 @@ export function teardown_active_usage(client, usage) {
 
     function pvol_remove(pvols) {
         const by_vgroup = { };
-        let p;
         pvols.forEach(function (p) {
             if (!by_vgroup[p.vgroup.path])
                 by_vgroup[p.vgroup.path] = [];
@@ -749,14 +758,13 @@ export function teardown_active_usage(client, usage) {
             // If we would remove all physical volumes of a volume
             // group, remove the whole volume group instead.
             if (pvs.length == client.vgroups_pvols[p].length) {
-                return vg.Delete({ 'tear-down': { t: 'b', v: true } });
+                return vg.Delete(true, { 'tear-down': { t: 'b', v: true } }).then(reload_systemd);
             } else {
                 return Promise.all(pvs.map(pv => vg.RemoveDevice(pv.path, true, {})));
             }
         }
 
-        for (p in by_vgroup)
-            handle_vg(p);
+        return Promise.all(Object.keys(by_vgroup).map(handle_vg));
     }
 
     return Promise.all(Array.prototype.concat(

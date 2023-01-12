@@ -6,7 +6,7 @@ on:
 jobs:
   check:
     name: Protection checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     permissions:
       contents: read
       pull-requests: write
@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Clone target branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -26,11 +26,11 @@ jobs:
 
       - name: Clear .github-changes label
         if: ${{ !endsWith(github.event.action, 'labeled') }}
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6
         with:
           script: |
             try {
-              await github.issues.removeLabel({
+              await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,

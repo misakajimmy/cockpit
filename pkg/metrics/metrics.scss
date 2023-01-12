@@ -12,6 +12,17 @@
   }
 }
 
+html {
+  --metrics-heading-color: #fff;
+  --metrics-heading-time-color: #eee;
+}
+
+.pf-theme-dark {
+  --metrics-heading-color: var(--pf-global--BackgroundColor-dark-100);
+  --metrics-heading-time-color: var(--pf-global--BackgroundColor--300);
+  --metrics-events-border-color: #000;
+}
+
 // Remove doubled-up padding on "main" sections, when two+ sections are used.
 .pf-c-page__main-section + .pf-c-page__main-section {
   padding-top: 0;
@@ -184,18 +195,14 @@
   }
 
   // Don't wrap network in / out data
-  td[data-label="In"],
-  td[data-label="Out"] {
-    white-space: nowrap;
-  }
-
   // Shrink network cards and data a little more
   // (as space is costly and they use a lot)
   // FIXME: Let's fix the content (split off units) and drop this when we can
-  td[data-label="In"],
-  td[data-label="Out"],
-  td[data-label="Interface"] {
-    font-size: var(--pf-global--FontSize--xs);
+  .network-nowrap-shrink {
+    td {
+      white-space: nowrap;
+      font-size: var(--pf-global--FontSize--xs);
+    }
   }
 
   // Shrink percentage column to allow for more service text
@@ -231,6 +238,30 @@
         --pf-c-table--cell--responsive--PaddingTop: 0;
         --pf-c-table--cell--responsive--PaddingBottom: 0;
       }
+    }
+  }
+
+  .all-disks-no-gap {
+    // don't center the "View all disks" button
+    button {
+      padding-left: 0;
+      width: fit-content;
+    }
+  }
+}
+
+.pf-c-popover {
+  thead th:not(:first-child) {
+    text-align: right;
+  }
+
+  .disks-nowrap {
+    td {
+      white-space: nowrap;
+    }
+
+    td:not(:first-child) {
+      text-align: right;
     }
   }
 }
@@ -316,9 +347,10 @@
     margin: 0.5rem;
   }
 
-  &-sublabels {
-    font-size: var(--pf-global--FontSize--xs);
-    color: rgb(0 0 0 / 70%);
+  &-sublabels.pf-c-content {
+    small {
+      font-size: var(--pf-global--FontSize--xs);
+    }
     display: flex;
   }
 
@@ -344,6 +376,8 @@
 
   &-events {
     width: 100%;
+
+    --pf-c-table--BorderColor: var(--metrics-events-border-color, default);
 
     // Remove left padding from the table toggle
     .pf-c-table__toggle {
@@ -390,14 +424,13 @@
   }
 
   &-time {
-    background: #eee;
-
+    background: var(--metrics-heading-time-color);
     padding: 0.5rem 1rem;
     margin-left: var(--pf-global--spacer--md);
   }
 
   &-heading {
-    background: #fff;
+    background: var(--metrics-heading-color);
     margin-bottom: 0.25rem;
     box-shadow: var(--pf-global--BoxShadow--sm);
 

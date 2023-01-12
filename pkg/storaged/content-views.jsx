@@ -224,7 +224,7 @@ function create_tabs(client, target, is_partition, is_extended) {
     } else if (content_block && (content_block.IdUsage == "raid" ||
                                  client.legacy_vdo_overlay.find_by_backing_block(content_block))) {
         // no tab for these
-    } else if (content_block && content_block.IdUsage == "other" && content_block.IdType == "swap") {
+    } else if (block_swap || (content_block && content_block.IdUsage == "other" && content_block.IdType == "swap")) {
         add_tab(_("Swap"), SwapTab, true);
     } else if (content_block) {
         is_unrecognized = true;
@@ -387,7 +387,8 @@ function create_tabs(client, target, is_partition, is_extended) {
                                         return lvol.Delete({ 'tear-down': { t: 'b', v: true } });
                                     else if (block_part)
                                         return block_part.Delete({ 'tear-down': { t: 'b', v: true } });
-                                });
+                                })
+                                .then(utils.reload_systemd);
                     }
                 },
                 Inits: [
@@ -493,6 +494,8 @@ function block_description(client, block) {
         type = C_("storage-id-desc", "VDO backing");
         used_for = vdo.name;
         link = ["vdo", vdo.name];
+    } else if (client.blocks_swap[block.path]) {
+        type = C_("storage-id-desc", "Swap space");
     } else {
         type = C_("storage-id-desc", "Unrecognized data");
     }
@@ -715,7 +718,8 @@ const BlockContent = ({ client, block, allow_partitions }) => {
                     return utils.teardown_active_usage(client, usage)
                             .then(function () {
                                 return block.Format(vals.type, options);
-                            });
+                            })
+                            .then(utils.reload_systemd);
                 }
             },
             Inits: [
@@ -952,11 +956,13 @@ export class VGroup extends React.Component {
                                    visible: vals => vals.purpose === 'vdo',
                                    fields: [
                                        {
-                                           tag: "compression", title: _("Compression"),
+                                           tag: "compression",
+                                           title: _("Compression"),
                                            tooltip: _("Save space by compressing individual blocks with LZ4")
                                        },
                                        {
-                                           tag: "deduplication", title: _("Deduplication"),
+                                           tag: "deduplication",
+                                           title: _("Deduplication"),
                                            tooltip: _("Save space by storing identical data blocks just once")
                                        },
                                    ],

@@ -121,9 +121,11 @@ def parse_sourcemap(f, line_starts, webpack_name):
 class DistFile:
     def __init__(self, path, webpack_name):
         line_starts = [0]
-        for line in open(path, newline='').readlines():
-            line_starts.append(line_starts[-1] + len(line))
-        self.smap = parse_sourcemap(open(path + ".map"), line_starts, webpack_name)
+        with open(path, newline='') as f:
+            for line in f.readlines():
+                line_starts.append(line_starts[-1] + len(line))
+        with open(path + ".map") as f:
+            self.smap = parse_sourcemap(f, line_starts, webpack_name)
 
     def find_sources_slow(self, start, end):
         res = []
@@ -143,30 +145,37 @@ class DistFile:
         return res
 
 
-def get_dist_map():
+def get_dist_map(package):
     dmap = {}
-    for f in glob.glob(f"{BASE_DIR}/dist/*/manifest.json") + glob.glob(f"{BASE_DIR}/dist/manifest.json"):
-        m = json.load(open(f))
+    for manifest_json in glob.glob(f"{BASE_DIR}/dist/*/manifest.json") + glob.glob(f"{BASE_DIR}/dist/manifest.json"):
+        with open(manifest_json) as f:
+            m = json.load(f)
         if "name" in m:
-            dmap[m["name"]] = os.path.dirname(f)
+            dmap[m["name"]] = os.path.dirname(manifest_json)
+        elif manifest_json == f"{BASE_DIR}/dist/manifest.json":
+            if "name" in package:
+                dmap[package["name"]] = os.path.dirname(manifest_json)
     return dmap
 
 
 def get_distfile(url, dist_map, webpack_name):
     parts = url.split("/")
-    if len(parts) > 2 and "cockpit" in parts:
-        base = parts[-2]
-        file = parts[-1]
-        if file == "manifests.js":
-            return None
-        if base in dist_map:
-            path = dist_map[base] + "/" + file
-        else:
-            path = f"{BASE_DIR}/dist/" + base + "/" + file
-        if os.path.exists(path) and os.path.exists(path + ".map"):
-            return DistFile(path, webpack_name)
-        else:
-            sys.stderr.write(f"SKIP {url} -> {path}\n")
+    if len(parts) < 3 or "cockpit" not in parts:
+        return None
+
+    base = parts[-2]
+    file = parts[-1]
+    if file == "manifests.js":
+        return None
+    if base in dist_map:
+        path = dist_map[base] + "/" + file
+    else:
+        path = f"{BASE_DIR}/dist/" + base + "/" + file
+    if os.path.exists(path) and os.path.exists(path + ".map"):
+        return DistFile(path, webpack_name)
+    else:
+        sys.stderr.write(f"SKIP {url} -> {path}\n")
+        return None
 
 
 def grow_array(arr, size, val):
@@ -281,8 +290,9 @@ def print_diff_coverage(path, file_hits, out):
 
 def write_lcov(covdata, outlabel):
 
-    package = json.load(open(f"{BASE_DIR}/package.json"))
-    dist_map = get_dist_map()
+    with open(f"{BASE_DIR}/package.json") as f:
+        package = json.load(f)
+    dist_map = get_dist_map(package)
     file_hits = {}
 
     def covranges(functions):

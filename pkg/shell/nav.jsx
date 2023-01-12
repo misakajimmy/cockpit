@@ -17,7 +17,12 @@ export const SidebarToggle = () => {
     const [active, setActive] = useState(false);
 
     useEffect(() => {
+        const handleClickOutside = () => setActive(false);
+
         document.getElementById("nav-system").classList.toggle("interact");
+        window.addEventListener("blur", handleClickOutside);
+
+        return () => window.removeEventListener("blur", handleClickOutside);
     }, [active]);
 
     return (
@@ -201,7 +206,7 @@ export function CockpitNavItem(props) {
         <li className={classes.join(" ")}>
             <a className={"pf-c-nav__link" + (props.active ? " pf-m-current" : "")}
                 aria-current={props.active && "page"}
-                href={props.to} onClick={ev => {
+                href={cockpit.location.encode(props.to, {}, true)} onClick={ev => {
                     props.jump(props.to);
                     ev.preventDefault();
                 }}>

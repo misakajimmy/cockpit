@@ -70,7 +70,7 @@ function jwk_b64_encode(bytes) {
 function compute_thp(jwk) {
     const REQUIRED_ATTRS = {
         RSA: ['kty', 'p', 'd', 'q', 'dp', 'dq', 'qi', 'oth'],
-        EC:  ['kty', 'crv', 'x', 'y'],
+        EC: ['kty', 'crv', 'x', 'y'],
         oct: ['kty', 'k'],
     };
 
@@ -281,7 +281,7 @@ function add_dialog(client, block) {
         Fields: [
             SelectOneRadio("type", _("Key source"),
                            {
-                               value: "tang",
+                               value: "luks-passphrase",
                                visible: vals => client.features.clevis,
                                widest_title: _("Repeat passphrase"),
                                choices: [

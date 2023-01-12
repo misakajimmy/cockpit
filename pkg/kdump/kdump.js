@@ -19,11 +19,12 @@
 
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import 'polyfills'; // once per application
+import 'cockpit-dark-theme'; // once per page
 
 import cockpit from "cockpit";
 
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 
 import { KdumpPage } from "./kdump-view.jsx";
 import * as kdumpClient from "./kdump-client.js";
@@ -32,6 +33,7 @@ import { superuser } from "superuser";
 superuser.reload_page_on_change();
 
 const initStore = function(rootElement) {
+    const root = createRoot(rootElement);
     const dataStore = { };
     dataStore.domRootElement = rootElement;
 
@@ -57,7 +59,7 @@ const initStore = function(rootElement) {
         });
     }
     const render = function() {
-        ReactDOM.render(React.createElement(KdumpPage, {
+        root.render(React.createElement(KdumpPage, {
             kdumpActive: false,
             onSetServiceState: setServiceState,
             stateChanging: dataStore.stateChanging,
@@ -66,7 +68,7 @@ const initStore = function(rootElement) {
             kdumpCmdlineEnabled: dataStore.crashkernel || false,
             onSaveSettings: dataStore.saveSettings,
             onCrashKernel: dataStore.kdumpClient.crashKernel,
-        }), rootElement);
+        }));
     };
     dataStore.render = render;
 

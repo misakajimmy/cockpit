@@ -140,7 +140,7 @@ function SetPasswordDialogBody({ state, errors, change }) {
                            validated={(errors && errors.password_old) ? "error" : "default"}
                            fieldId="account-set-password-old">
                     <TextInput className="check-passwords" type="password" id="account-set-password-old"
-                               autocomplete="current-password" value={password_old} onChange={value => change("password_old", value)} />
+                               autoComplete="current-password" value={password_old} onChange={value => change("password_old", value)} />
                 </FormGroup>
             </> }
             <PasswordFormFields password_label={_("New password")}
@@ -194,7 +194,7 @@ export function set_password_dialog(account, current_user) {
 
         return password_quality(password, force)
                 .catch(ex => {
-                    errs.password = (ex.message || ex.toString()).replace("\n", " ");
+                    errs.password = (ex.message || ex.toString()).replaceAll("\n", " ");
                 })
                 .then(() => {
                     errors = errs;
@@ -203,7 +203,7 @@ export function set_password_dialog(account, current_user) {
     }
 
     function passwd_check(force, password, password_confirm, password_old) {
-        return validate(force, password, password_confirm, password_old).then(valid => {
+        return validate(force, password, password_confirm).then(valid => {
             if (valid) {
                 if (change_self)
                     return passwd_self(password_old, password);
@@ -278,7 +278,7 @@ export function reset_password_dialog(account) {
                 style: "primary",
                 clicked: () => {
                     return cockpit.spawn(["/usr/bin/passwd", "-e", account.name],
-                                         { superuser : true, err: "message" });
+                                         { superuser: true, err: "message" });
                 }
             }
         ]

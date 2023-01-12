@@ -177,7 +177,7 @@ const TunedDialog = ({
                     /* Yup this is how tuned returns failures */
                         if (!results[0]) {
                             console.warn("Failed to disable tuned profile:", results);
-                            return Promise.reject(_("Failed to disabled tuned profile"));
+                            return Promise.reject(_("Failed to disable tuned profile"));
                         }
 
                         updateButton();
@@ -297,13 +297,13 @@ const TunedDialog = ({
 
     return (
         <Modal position="top" variant="medium"
+               className="ct-m-stretch-body"
                isOpen
                help={help}
                onClose={Dialogs.close}
                title={_("Change performance profile")}
                footer={
                    <>
-                       {error && <ModalError dialogError={typeof error == 'string' ? error : error.message} />}
                        <Button variant='primary' isDisabled={!selected} onClick={setProfile}>
                            {_("Change profile")}
                        </Button>
@@ -313,6 +313,7 @@ const TunedDialog = ({
                    </>
                }
         >
+            {error && <ModalError dialogError={typeof error == 'string' ? error : error.message} />}
             {loading && <EmptyStatePanel loading />}
             {activeProfile && <ProfilesMenuDialogBody active_profile={activeProfile}
                                                change_selected={setSelected}

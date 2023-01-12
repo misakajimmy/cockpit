@@ -11,6 +11,22 @@
         console.warn(String(ex));
     }
 
+    /* Dark mode */
+    const theme = localStorage.getItem('shell:style');
+    if ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && theme === "auto") || theme === "dark") {
+        document.documentElement.classList.add('pf-theme-dark');
+    } else {
+        document.documentElement.classList.remove('pf-theme-dark');
+    }
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        if ((event.matches && theme === "auto") || theme === "dark") {
+            document.documentElement.classList.add('pf-theme-dark');
+        } else {
+            document.documentElement.classList.remove('pf-theme-dark');
+        }
+    });
+
     let url_root;
     const environment = window.environment || { };
     const oauth = environment.OAuth || null;
@@ -164,7 +180,31 @@
     }
 
     function requisites() {
-        function disableLogin(name) {
+        function showBypass(bypass) {
+            if (bypass) {
+                // Selectively show and hide elements
+                show("#login", "#login-details", "#login-override");
+                hide("#get-out-link");
+
+                // Reparent login form to the expander
+                id("login-override-content").appendChild(id("login"));
+
+                // Change the state of the button from primary to warning
+                id("login-button").classList.add("pf-m-warning");
+
+                // Render a "helper text" warning above the log in button
+                document.querySelector("#login .login-actions").insertAdjacentHTML(
+                    "beforebegin",
+                    "<div class='pf-c-helper-text pf-m-warning' id='bypass-warning'>" +
+                    _("Cockpit might not render correctly in your browser") +
+                    "</div>"
+                );
+            } else {
+                hide("#login", "#login-details", "#login-override");
+            }
+        }
+
+        function disableLogin(name, bypass) {
             if (name === "supports")
                 name = "@supports API";
             const errorString = format(_("This web browser is too old to run the Web Console (missing $0)"), name);
@@ -172,9 +212,10 @@
             if (window.console)
                 console.warn(errorString);
             id("login-error-message").textContent = errorString;
-            hide("#login", "#login-details");
             show("#unsupported-browser", "#error-group");
-            document.body.classList.add("brand-unsupported-browser");
+            document.body.classList.add("unsupported-browser");
+
+            showBypass(bypass);
         }
 
         function req(name, obj) {
@@ -205,13 +246,13 @@
             const args = [].join.call(arguments, ": ");
 
             if (!window.CSS || !window.CSS.supports.apply(this, arguments)) {
-                disableLogin(args);
+                disableLogin(args, "bypass");
                 return false;
             }
             return true;
         }
 
-        return req("WebSocket", window) &&
+        const hard_req = req("WebSocket", window) &&
                req("XMLHttpRequest", window) &&
                req("sessionStorage", window) &&
                req("JSON", window) &&
@@ -221,11 +262,17 @@
                req("textContent", document) &&
                req("replaceAll", String.prototype) &&
                req("finally", Promise.prototype) &&
-               req("supports", window.CSS) &&
-               css("display", "flex") &&
-               css("display", "grid") &&
-               css("selector(test)") &&
-               css("selector(:is(*):where(*))");
+               req("supports", window.CSS);
+
+        if (hard_req) {
+            css("display", "flex") &&
+            css("display", "grid") &&
+            css("selector(test)") &&
+            css("selector(:is(*):where(*))");
+            return true;
+        } else {
+            return false;
+        }
     }
 
     function trim(s) {
@@ -280,13 +327,6 @@
         hideToggle("#server-group", !show);
 
         id("option-group").setAttribute("data-state", show);
-        if (show) {
-            id("option-caret").classList.add("caret-down");
-            id("option-caret").classList.remove("caret-right");
-        } else {
-            id("option-caret").classList.add("caret-right");
-            id("option-caret").classList.remove("caret-down");
-        }
     }
 
     function toggle_password(event) {
@@ -300,8 +340,11 @@
         window.onload = null;
 
         translate();
-        if (window.cockpit_po && window.cockpit_po[""])
-            document.documentElement.lang = window.cockpit_po[""].language || "en-us";
+        if (window.cockpit_po && window.cockpit_po[""]) {
+            document.documentElement.lang = window.cockpit_po[""].language;
+            if (window.cockpit_po[""]["language-direction"])
+                document.documentElement.dir = window.cockpit_po[""]["language-direction"];
+        }
 
         setup_path_globals(window.location.pathname);
 

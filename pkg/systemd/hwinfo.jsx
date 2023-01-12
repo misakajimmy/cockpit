@@ -22,7 +22,7 @@ import 'polyfills'; // once per application
 
 import cockpit from "cockpit";
 import React from "react";
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import * as timeformat from 'timeformat';
 
@@ -169,11 +169,10 @@ class CPUSecurityMitigationsDialog extends React.Component {
         this.state = {
             nosmt: undefined,
             alert: undefined,
-            mitigationsAvailable: false,
             rebooting: false,
         };
         availableMitigations().then(({ available, nosmt_enabled }) => {
-            this.setState({ mitigationsAvailable: available, nosmt: nosmt_enabled });
+            this.setState({ nosmt: nosmt_enabled });
         });
     }
 
@@ -327,7 +326,7 @@ class HardwareInfo extends React.Component {
                           <BreadcrumbItem onClick={ () => cockpit.jump("/system", cockpit.transport.host)} className="pf-c-breadcrumb__link">{ _("Overview") }</BreadcrumbItem>
                           <BreadcrumbItem isActive>{ _("Hardware information") }</BreadcrumbItem>
                       </Breadcrumb>}>
-                <PageSection className="ct-pagesection-mobile">
+                <PageSection>
                     <Gallery hasGutter>
                         <Card>
                             <CardHeader>
@@ -372,6 +371,7 @@ class HardwareInfo extends React.Component {
 document.addEventListener("DOMContentLoaded", () => {
     document.title = cockpit.gettext(document.title);
     detect().then(info => {
-        ReactDOM.render(<WithDialogs><HardwareInfo info={info} /></WithDialogs>, document.getElementById("hwinfo"));
+        const root = createRoot(document.getElementById('hwinfo'));
+        root.render(<WithDialogs><HardwareInfo info={info} /></WithDialogs>);
     });
 });

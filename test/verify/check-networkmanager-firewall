@@ -19,7 +19,7 @@
 
 import parent  # noqa: F401
 import time
-from testlib import Error, nondestructive, skipDistroPackage, skipImage, test_main, wait
+from testlib import Error, nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main, wait
 from netlib import NetworkCase
 
 
@@ -46,10 +46,10 @@ def get_active_rules(machine):
     return active_rules
 
 
-@skipImage("TODO: Arch Linux shows no firewalld page", "arch")
 @skipImage("no firewalld", "fedora-coreos")
 @nondestructive
 @skipDistroPackage()
+@todoPybridge()
 class TestFirewall(NetworkCase):
     def setUp(self):
         super().setUp()
@@ -60,13 +60,9 @@ class TestFirewall(NetworkCase):
         self.btn_primary = "pf-m-primary"
         self.default_zone = "Public zone"
 
-        # Temporary remove the test Dbus port 8765, this workaround can be
-        # removed once the pixel tests are merged and the image updated to not
-        # open port 8765
-        if m.image.startswith("fedora"):
-            m.execute("firewall-cmd --permanent --remove-port=8765/tcp")
-            m.execute("firewall-cmd --remove-port=8765/tcp")
-            m.execute("firewall-cmd --reload")
+        # Arch Linux image has no active zones by default
+        if m.image == "arch":
+            m.execute("firewall-cmd --zone 'public' --change-interface='eth0'; firewall-cmd --runtime-to-permanent")
 
     def testNetworkingPage(self):
         b = self.browser
@@ -126,6 +122,27 @@ class TestFirewall(NetworkCase):
         self.allow_journal_messages(
             ".*The name org.fedoraproject.FirewallD1 was not provided by any .service files.*",
             ".*org.fedoraproject.FirewallD1: .*: GDBus.Error:org.freedesktop.DBus.Error.NoReply.*")
+
+    # test missing "pkcheck" binary, in that case fallback to the admin check
+    def testPkcheckMissing(self):
+        b = self.browser
+        m = self.machine
+
+        # Path to the "pkcheck" PolicyKit utility
+        pkcheck = m.execute("which pkcheck").strip()
+        # "Hide" pkcheck
+        m.execute(f"mount --bind /dev/null '{pkcheck}'")
+
+        try:
+            # Regular user is not allowed to change the firewall switch
+            self.login_and_go("/network", superuser=False)
+            b.wait_visible("#networking-firewall-switch:disabled")
+
+            # Super user is allowed to change the firewall switch
+            b.relogin("/network", superuser=True)
+            b.wait_visible("#networking-firewall-switch:not([disabled])")
+        finally:
+            m.execute(f"umount '{pkcheck}'")
 
     def testFirewallPage(self):
         b = self.browser

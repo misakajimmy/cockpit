@@ -20,9 +20,10 @@
 import '../lib/patternfly/patternfly-4-cockpit.scss';
 import './sosreport.scss';
 import "polyfills";
+import 'cockpit-dark-theme'; // once per page
 
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from 'react-dom/client';
 import {
     Alert,
     Button,
@@ -527,7 +528,7 @@ const SOSPage = () => {
     return (
         <WithDialogs>
             <Page>
-                <PageSection variant={PageSectionVariants.light}>
+                <PageSection padding={{ default: "padding" }} variant={PageSectionVariants.light}>
                     <Flex alignItems={{ default: 'alignItemsCenter' }}>
                         <h2 className="pf-u-font-size-3xl">{_("System diagnostics")}</h2>
                     </Flex>
@@ -539,5 +540,6 @@ const SOSPage = () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     cockpit.translate();
-    ReactDOM.render(<SOSPage />, document.getElementById('app'));
+    const root = createRoot(document.getElementById('app'));
+    root.render(<SOSPage />);
 });

@@ -41,7 +41,6 @@
         "curly": "off",
         "no-template-curly-in-string": "off",
         "jsx-quotes": "off",
-        "key-spacing": "off",
         "no-console": "off",
         "quotes": "off",
         "react/jsx-curly-spacing": "off",
@@ -57,7 +56,6 @@
 
         "eqeqeq": "off",
         "import/no-webpack-loader-syntax": "off",
-        "object-property-newline": "off",
         "react/jsx-no-bind": "off",
         "react/jsx-wrap-multilines": "off"
     },

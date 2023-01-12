@@ -23,7 +23,7 @@ import time
 
 import parent  # noqa: F401
 from packagelib import PackageCase
-from testlib import nondestructive, skipDistroPackage, skipImage, test_main
+from testlib import nondestructive, skipDistroPackage, skipImage, todoPybridge, test_main
 
 
 WAIT_SCRIPT = """
@@ -38,8 +38,9 @@ done
 """
 
 OSesWithoutTracer = ["debian-stable", "debian-testing", "ubuntu-2204", "ubuntu-stable", "fedora-coreos"]
-OSesWithoutKpatch = ["debian-stable", "debian-testing", "ubuntu-2204", "ubuntu-stable",
-                     "fedora-coreos", "fedora-35", "fedora-36", "fedora-37", "fedora-testing", "centos-8-stream", "arch"]
+OSesWithoutKpatch = ["debian-stable", "debian-testing", "ubuntu-2204", "ubuntu-stable", "arch",
+                     "fedora-coreos", "fedora-36", "fedora-37", "fedora-38", "fedora-testing",
+                     "centos-8-stream", "centos-9-stream"]
 
 
 class NoSubManCase(PackageCase):
@@ -114,10 +115,10 @@ class TestUpdates(NoSubManCase):
                          num_issues is not None and str(num_issues) or "")
 
         # should not be expanded by default
-        self.assertFalse("pf-m-expanded" in b.attr(row, "class"))
+        self.assertNotIn("pf-m-expanded", b.attr(row, "class"))
         # expand
         b.click(row + "td.pf-c-table__toggle button")
-        self.assertTrue("pf-m-expanded" in b.attr(row, "class"))
+        self.assertIn("pf-m-expanded", b.attr(row, "class"))
         b.wait_in_text(row + "> tr.pf-m-expanded", "Packages")
         desc = b.text(row + "> tr.pf-m-expanded")
 
@@ -140,8 +141,8 @@ class TestUpdates(NoSubManCase):
                 if good_count >= 3:
                     return
             time.sleep(1)
-        else:
-            self.fail("Timed out waiting for updates spinner to go away")
+
+        self.fail("Timed out waiting for updates spinner to go away")
 
     @nondestructive
     @skipImage("kpatch is not available", *OSesWithoutKpatch)
@@ -281,6 +282,7 @@ echo -e "Loaded patch modules:\nkpatch_3_10_0_1062_1_1 [enabled]\n\nInstalled pa
         m.execute("rpm -q kpatch-patch-" + sanitized_kernel_ver)
 
     @nondestructive
+    @todoPybridge()
     def testBasic(self):
         # no security updates, no changelogs
         b = self.browser
@@ -368,26 +370,29 @@ echo -e "Loaded patch modules:\nkpatch_3_10_0_1062_1_1 [enabled]\n\nInstalled pa
             mkfifo $f
             mount -o bind $f $p
             echo $p""").strip()
+        try:
+            b.click("#available-updates button#install-all")
 
-        b.click("#available-updates button#install-all")
+            # applying updates panel present
+            b.wait_visible("#app div.pf-c-progress__bar")
 
-        # applying updates panel present
-        b.wait_visible("#app div.pf-c-progress__bar")
+            # cancel the installation
+            b.wait_in_text(".progress-main-view button.pf-m-secondary", "Cancel")
+            b.click(".progress-main-view button.pf-m-secondary")
+            # abort the current download, so that read calls don't hang indefinitely
+            m.spawn(f"echo > {self.vm_tmpdir}/fifo", "fifo")
 
-        # cancel the installation
-        b.wait_in_text(".progress-main-view button.pf-m-secondary", "Cancel")
-        b.click(".progress-main-view button.pf-m-secondary")
-        # abort the current download, so that read calls don't hang indefinitely
-        m.spawn(f"echo > {self.vm_tmpdir}/fifo", "fifo")
-
-        # going back to overview, nothing happened just yet
-        b.wait_not_present(".progress-main-view")
-        self.assertEqual(b.text("#available-updates button#install-all"), "Install all updates")
-        self.assertFalse(b.is_present("table.updates-history"))
-        m.execute("test -f /stamp-vanilla-1.0-1; test -f /stamp-chocolate-2.0-1")
+            # going back to overview, nothing happened just yet
+            b.wait_not_present(".progress-main-view")
+            self.assertEqual(b.text("#available-updates button#install-all"), "Install all updates")
+            self.assertFalse(b.is_present("table.updates-history"))
+            m.execute("test -f /stamp-vanilla-1.0-1; test -f /stamp-chocolate-2.0-1")
+        finally:
+            # avoid keeping the rpm file busy
+            m.execute("systemctl stop packagekit")
+            m.execute(f"umount {chocolate}")
 
         # update again; Cancel button should eventually disappear
-        m.execute(f"umount {chocolate}")
         b.click("#available-updates button#install-all")
         b.wait_visible(".progress-main-view")
         b.wait_not_present(".progress-main-view button.pf-m-secondary")
@@ -431,6 +436,7 @@ echo -e "Loaded patch modules:\nkpatch_3_10_0_1062_1_1 [enabled]\n\nInstalled pa
 
     @skipImage("TODO: Packagekit on Arch does not detect the pear update", "arch")
     @skipImage("tracer not available", *OSesWithoutTracer)
+    @todoPybridge(".updates-success-table randomly appears or not with pybridge", flaky=True)
     def testTracer(self):
         b = self.browser
         m = self.machine
@@ -675,8 +681,8 @@ ExecStart=/usr/local/bin/{packageName}
         b.wait_visible("#restart-services-modal")
 
         # tracer updated the list of services which need a restart, so our service is no longer present
-        b.wait_not_in_text("#restart-services-modal .pf-c-modal-box__body", packageName)
-        b.wait_visible("#restart-services-modal footer .pf-c-alert")
+        b.wait_not_in_text("#restart-services-modal .pf-l-stack__item", packageName)
+        b.wait_visible("#restart-services-modal .pf-c-alert")
 
     @skipImage("No security changelog support in packagekit", "arch")
     def testInfoSecurity(self):
@@ -766,9 +772,11 @@ ExecStart=/usr/local/bin/{packageName}
         # verify Markdown formatting in table cell
         self.assertEqual(b.text(sel + " td.changelog em"), "more")  # *more*
         self.assertEqual(b.attr(sel + " td.changelog a", "href"), "http://unicorn.example.com")
+        self.assertEqual(b.attr(sel + " td.changelog a", "target"), "_blank")
         # verify Markdown formatting in details
         self.assertEqual(b.text(sel + " .pf-m-expanded em"), "more")  # *more*
         self.assertEqual(b.attr(sel + " .pf-m-expanded a:first-of-type", "href"), "http://unicorn.example.com")
+        self.assertEqual(b.attr(sel + " .pf-m-expanded a:first-of-type", "target"), "_blank")
 
         # verify that changelog is absent in mobile
         b.set_layout("mobile")
@@ -824,9 +832,6 @@ ExecStart=/usr/local/bin/{packageName}
         # should now only have one button (no security updates left)
         self.assertEqual(b.text("#available-updates button#install-all"), "Install all updates")
         b.click("#available-updates button#install-all")
-
-        # applying updates panel present
-        b.wait_visible("#app div.pf-c-progress__bar")
 
         # should have succeeded and show restart
         with b.wait_timeout(60):
@@ -977,6 +982,7 @@ ExecStart=/usr/local/bin/{packageName}
 
         # seems we can't verify that the description has a scrollbar
 
+    @todoPybridge("sometimes locks up packagekit hard, warning: python.error in the JS log", flaky=True)
     def testRebootAfterSuccess(self):
         b = self.browser
         m = self.machine
@@ -1040,6 +1046,7 @@ ExecStart=/usr/local/bin/{packageName}
         self.assertFalse(b.is_present("#app button"))
 
     @nondestructive
+    @todoPybridge()
     def testPackageKitCrash(self):
         b = self.browser
         m = self.machine
@@ -1069,15 +1076,15 @@ ExecStart=/usr/local/bin/{packageName}
         # let updates start and zap PackageKit
         b.wait_visible("#app div.pf-c-progress__bar")
         m.execute("systemctl kill --signal=SEGV packagekit.service")
-
-        # error message visible
-        b.wait_in_text("#app .pf-c-page .pf-c-empty-state__body", "PackageKit crashed")
-
         # this crash creates so many messages from systemd-coredump, debug metadata etc. that
         # trying to keep up with specific patterns is too brittle
         self.allow_journal_messages(".*")
 
+        # error message visible
+        b.wait_in_text("#app .pf-c-page .pf-c-empty-state__body", "PackageKit crashed")
+
     @nondestructive
+    @todoPybridge()
     def testNoPackageKit(self):
         b = self.browser
         m = self.machine
@@ -1146,6 +1153,7 @@ ExecStart=/usr/local/bin/{packageName}
 @skipImage("TODO: Arch Linux has no cockpit-ws package, it's in cockpit", "arch")
 @skipImage("Image uses OSTree", "fedora-coreos")
 class TestWsUpdate(NoSubManCase):
+    @todoPybridge()
     def testBasic(self):
         # The main case for this is that cockpit-ws itself gets upgraded, which
         # restarts the service and terminates the connection. As we can't
@@ -1253,7 +1261,7 @@ class TestKpatchInstall(NoSubManCase):
 
 @skipImage("Image uses OSTree", "fedora-coreos")
 @skipImage("No subscriptions", "debian-stable", "debian-testing", "centos-8-stream",
-           "fedora-35", "fedora-36", "fedora-37", "fedora-testing", "ubuntu-2204", "ubuntu-stable", "arch")
+           "fedora-36", "fedora-37", "fedora-38", "fedora-testing", "ubuntu-2204", "ubuntu-stable", "arch")
 class TestUpdatesSubscriptions(PackageCase):
     provision = {
         "0": {"address": "10.111.112.1/20", "dns": "10.111.112.1", "memory_mb": 512},
