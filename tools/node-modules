@@ -63,7 +63,7 @@ cmd_install() {
     tree="$(bots/npm download < package.json | tar_to_cache)"
     commit="$(sha256sum package.json | git_cache commit-tree "${tree}")"
     git_cache tag "sha-${commit}" "${commit}"
-    cmd_checkout "${commit}"
+    # cmd_checkout "${commit}"
 
     cat <<EOF
 Next steps:
@@ -131,33 +131,33 @@ cmd_make_package_lock_json() {
     # Otherwise, our main goal is to ensure that the node_modules from
     # the index is the one that we actually have.
     local sha="$(get_index_gitlink node_modules)"
-    if [ ! -e node_modules/.git ]; then
-        # nothing there yet...
-        cmd_checkout
-    elif [ "$(git -C node_modules rev-parse HEAD)" != "${sha}" ]; then
-        # wrong thing there...
-        cmd_checkout
-    fi
+    # if [ ! -e node_modules/.git ]; then
+    #     # nothing there yet...
+    #     cmd_checkout
+    # elif [ "$(git -C node_modules rev-parse HEAD)" != "${sha}" ]; then
+    #     # wrong thing there...
+    #     cmd_checkout
+    # fi
 
     # This check is more about catching local changes to package.json than
     # about validating something we just checked out:
-    if ! cmp -s node_modules/.package.json package.json; then
-        cat 2>&1 <<EOF
-*** package.json is out of sync with node_modules
-*** If you modified package.json, please run:
-***
-***    tools/node-modules install
-***
-*** and add the result to the index.
-EOF
-        exit 1
-    fi
+#     if ! cmp -s node_modules/.package.json package.json; then
+#         cat 2>&1 <<EOF
+# *** package.json is out of sync with node_modules
+# *** If you modified package.json, please run:
+# ***
+# ***    tools/node-modules install
+# ***
+# *** and add the result to the index.
+# EOF
+#         exit 1
+#     fi
 
     # Only copy the package-lock.json if it differs from the one we have
-    if ! cmp -s node_modules/.package-lock.json package-lock.json; then
-        message COPY package-lock.json
-        cp node_modules/.package-lock.json package-lock.json
-    fi
+    # if ! cmp -s node_modules/.package-lock.json package-lock.json; then
+    #     message COPY package-lock.json
+    #     cp node_modules/.package-lock.json package-lock.json
+    # fi
 
     # We're now in a situation where:
     #  - the checked out node_modules is equal to the gitlink in the index

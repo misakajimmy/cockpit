@@ -26,7 +26,7 @@ sha256sums=('SKIP'
 prepare() {
   cd cockpit-$pkgver
   # TODO: disable buggy package-lock check
-  sed -r '/^cmd_make_package_lock_json\b/ a exit 0' -i tools/node-modules
+  # sed -r '/^cmd_make_package_lock_json\b/ a exit 0' -i tools/node-modules
 }
 
 build() {
