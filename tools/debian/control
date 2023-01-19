@@ -107,7 +107,7 @@ Package: buddy-storaged
 Architecture: all
 Multi-Arch: foreign
 Depends: ${misc:Depends},
-         udisks2 (>= 2.9),
+         udisks2,
          libblockdev-mdraid2,
          buddy-bridge (>= ${source:Version}),
          python3,

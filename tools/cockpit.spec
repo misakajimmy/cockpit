@@ -603,9 +603,9 @@ Dummy package from building optional packages only; never install or publish me.
 %package -n cockpit-storaged
 Summary: Cockpit user interface for storage, using udisks
 Requires: cockpit-shell >= %{required_base}
-Requires: udisks2 >= 2.9
-Recommends: udisks2-lvm2 >= 2.9
-Recommends: udisks2-iscsi >= 2.9
+Requires: udisks2
+Recommends: udisks2-lvm2
+Recommends: udisks2-iscsi
 Recommends: device-mapper-multipath
 Recommends: clevis-luks
 Requires: %{__python3}

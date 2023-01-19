@@ -16,6 +16,8 @@ RUN apt update && \
     rm /usr/bin/python3 && \
     ln -s /usr/bin/python3.9 /usr/bin/python3
 
+RUN apt install -y gettext appstream libssh-dev zlib1g-dev libkrb5-dev libxslt1-dev libglib2.0-dev libgnutls28-dev gnutls-dev libsystemd-dev libpolkit-agent-1-dev libpcp3-dev libjson-glib-dev libpam0g-dev libpcp-import1-dev libpcp-pmda3-dev systemd xsltproc xmlto docbook-xsl glib-networking
+
 COPY tools/build.sh /tmp
 
 RUN ['/tmp/build.sh']
