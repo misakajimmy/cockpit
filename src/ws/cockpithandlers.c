@@ -757,8 +757,10 @@ cockpit_handler_cookie(CockpitWebServer *server,
   // Check for auth
   service = cockpit_auth_check_cookie (data->auth, request);
 
-  if (!service)
-    return FALSE;
+  if (!service) {
+    cockpit_web_response_error (response, 401, NULL, "Unauthorized");
+    return TRUE;
+  }
 
   creds = cockpit_web_service_get_creds (service);
   g_return_val_if_fail (creds != NULL, FALSE);

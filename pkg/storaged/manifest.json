@@ -1,7 +1,6 @@
 {
     "name": "storage",
     "requires": {
-        "cockpit": "266"
     },
 
     "menu": {

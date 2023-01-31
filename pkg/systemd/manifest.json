@@ -2,7 +2,6 @@
     "name": "system",
 
     "requires": {
-        "cockpit": "265"
     },
 
     "menu": {

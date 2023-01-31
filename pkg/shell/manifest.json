@@ -1,6 +1,5 @@
 {
     "requires": {
-        "cockpit": "239"
     },
     "locales": {
         "cs-cz": "čeština",

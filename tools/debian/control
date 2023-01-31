@@ -59,8 +59,7 @@ Depends: ${misc:Depends},
          ${shlibs:Depends},
          glib-networking
 Provides: buddy-ssh
-Breaks: buddy-ws (<< 181.x),
-Replaces: buddy-dashboard (<< 170.x), buddy-ws (<< 181.x)
+Replaces: buddy-dashboard,buddy-ws 
 Description: Buddy bridge server-side component
  The Buddy bridge component installed server side and runs commands on
  the system on behalf of the web based user interface.
