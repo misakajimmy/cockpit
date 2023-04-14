@@ -69,9 +69,10 @@ tar --strip-components=1 -xf "$source"
 cp -r tools/debian .
 # plug in our version
 sed -i "1 s/(0-/(${version}-/" debian/changelog
-dpkg-buildpackage -us -uc -b -j$(nproc)
-cd -
+echo $(nproc)
+dpkg-buildpackage -b --ignore-buildeps -us -uc -b -j$(nproc) --host-arch arm64 
+# cd -
 
-find "$builddir"/.. -name '*.deb' -printf '%f\n' -exec mv {} . \;
+# find "$builddir"/.. -name '*.deb' -printf '%f\n' -exec mv {} . \;
 
-rm -r "$builddir"
+# rm -r "$builddir"
