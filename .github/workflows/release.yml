@@ -9,8 +9,11 @@ on:
 jobs:
   source:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [arm64]
     container:
-      image: ghcr.io/cockpit-project/unit-tests
+      image: arm64v8/ubuntu:20.04
       options: --user root
     permissions:
       # create GitHub release
@@ -21,15 +24,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: prepare environment
+        run: ./tools/prepare.sh
+
       - name: npm
         run: npm install
 
       - name: Bootstrap automake
-        run: ./autogen.sh
+        run: ./autogen.sh --prefix=/usr --enable-debug
+             make
 
       - name: Build release
-        run: make dist -j$(nproc) VERSION='${{ github.ref_name }}' &&
-             ls
+        run: tools/make-debs --quick
+
+      - name: Pack deb
+        run: tools/make-debs --quick
 
       - id: publish
         name: Publish GitHub release

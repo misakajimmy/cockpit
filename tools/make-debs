@@ -55,7 +55,15 @@ else
     source="$(realpath "$1")"
 fi
 
+echo $source
+
 version=$(echo "$source" | sed -n 's|.*cockpit-\([^ /-]\+\)\.tar\..*|\1|p')
+if [ -z "$REF_VERSION" ]; then 
+	echo "not github"
+else
+	version=${REF_VERSION}
+fi
+
 if [ -z "$version" ]; then
     echo "make-debs: couldn't parse version from tarball: $source"
     exit 2
@@ -70,9 +78,9 @@ cp -r tools/debian .
 # plug in our version
 sed -i "1 s/(0-/(${version}-/" debian/changelog
 echo $(nproc)
-dpkg-buildpackage -b --ignore-buildeps -us -uc -b -j$(nproc) --host-arch arm64 
-# cd -
+dpkg-buildpackage -us -uc -b -j$(nproc)
+cd -
 
-# find "$builddir"/.. -name '*.deb' -printf '%f\n' -exec mv {} . \;
+find "$builddir"/.. -name '*.deb' -printf '%f\n' -exec mv {} . \;
 
-# rm -r "$builddir"
+rm -r "$builddir"

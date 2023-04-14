@@ -1,0 +1,66 @@
+name: auto-release
+on:
+  push:
+    # branches:
+    #   - iEOS
+    tags:
+      # this is a glob, not a regexp
+      - '[0-9]*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: ${{ github.ref }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install QEMU
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static
+      - name: Set up binfmt
+        run: sudo update-binfmts --enable qemu-aarch64
+      - name: Docker login
+        uses: docker/login-action@v1
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Run ARM64 container
+        run: |
+          REF_VERSION=${GITHUB_REF##*/}
+          docker run --rm --privileged multiarch/qemu-user-static:register --reset
+          docker run --rm -v "${PWD}:/tmp/cockpit" -e REF_VERSION=$REF_VERSION misakajimmy/cockpit-arm64v8:0.1.1
+          ls
+          sudo chmod 777 ./*.deb
+          for file in buddy*.deb; do
+            echo $file
+            name=$(echo $file | sed 's/^buddy-//; s/_.*\.deb$//')
+            version=${GITHUB_REF##*/}
+            # echo buddy-$name_$version_arm64.deb
+            # echo buddy-${name}_${version}_arm64.deb
+            mv $file buddy-${name}_${version}_arm64.deb
+          done
+          zip -r "cockpit.zip" ./*.deb
+          ls
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Changes in this release:
+            - XXXXXX
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_name: "cockpit.zip"
+          asset_path: "cockpit.zip"
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
