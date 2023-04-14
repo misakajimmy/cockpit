@@ -21,8 +21,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: yarn
-        run: yarn
+      - name: npm
+        run: npm install
 
       - name: Bootstrap automake
         run: ./autogen.sh
