@@ -31,6 +31,9 @@ jobs:
         run: make dist -j$(nproc) VERSION='${{ github.ref_name }}' &&
              ls
 
+      - name: Pack deb
+        run: tools/make-debs --quick
+
       - id: publish
         name: Publish GitHub release
         uses: cockpit-project/action-release@d922a7ea21329cb46762e52a218c120e388fb0c1
