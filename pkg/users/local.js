@@ -22,6 +22,7 @@ import 'cockpit-dark-theme'; // once per page
 
 import cockpit from 'cockpit';
 import React, { useState, useEffect } from 'react';
+import './api';
 import { createRoot } from 'react-dom/client';
 import { superuser } from "superuser";
 
@@ -29,7 +30,7 @@ import { usePageLocation, useLoggedInUser, useFile } from "hooks.js";
 import { etc_passwd_syntax, etc_group_syntax } from "./parsers.js";
 import { AccountsMain } from "./accounts-list.js";
 import { AccountDetails } from "./account-details.js";
-
+import { UserPage } from "./user-page.jsx";
 superuser.reload_page_on_change();
 
 export const admins = ['sudo', 'root', 'wheel'];
@@ -46,7 +47,7 @@ const sortGroups = groups => {
     });
 };
 
-function AccountsPage() {
+export function AccountsPage() {
     const { path } = usePageLocation();
     const accounts = useFile("/etc/passwd", { syntax: etc_passwd_syntax });
     const shadow = useFile("/etc/shadow", { superuser: true });
@@ -136,7 +137,7 @@ async function getLogins() {
 
 function init() {
     const root = createRoot(document.getElementById("page"));
-    root.render(<AccountsPage />);
+    root.render(<UserPage />);
     document.body.removeAttribute("hidden");
 }
 

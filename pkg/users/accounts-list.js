@@ -313,6 +313,9 @@ const GroupsList = ({ groups, accounts }) => {
 };
 
 const AccountsList = ({ accounts, current_user, groups }) => {
+    // console.log(accounts);
+    // console.log(current_user);
+    // console.log(groups);
     const [currentTextFilter, setCurrentTextFilter] = useState("");
     const filtered_accounts = accounts.filter(account => {
         if (currentTextFilter !== "" &&
@@ -324,13 +327,15 @@ const AccountsList = ({ accounts, current_user, groups }) => {
 
         return true;
     });
+    const row = filtered_accounts.map(a => getAccountRow(a, current_user === a.name, groups));
+    // console.log(row);
 
     const columns = [
         { title: _("Username"), sortable: true },
         { title: _("Full name"), sortable: true },
         { title: _("ID"), sortable: true },
         { title: _("Last active"), sortable: true },
-        { title: _("Group") },
+        { title: _("Role") },
     ];
 
     const sortRows = (rows, direction, idx) => {
@@ -424,7 +429,7 @@ export const AccountsMain = ({ accountsInfo, current_user, groups }) => {
         <Page id="accounts">
             <PageSection>
                 <Stack hasGutter>
-                    <GroupsList accounts={accounts} groups={groups} />
+                    {/* <GroupsList accounts={accounts} groups={groups} /> */}
                     <AccountsList accounts={accounts} current_user={current_user} groups={groups} />
                 </Stack>
             </PageSection>
