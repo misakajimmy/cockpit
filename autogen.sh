@@ -4,6 +4,8 @@ set -eu
 
 srcdir="${0%/*}"
 
+git config --global --add safe.directory /__w/cockpit/cockpit
+
 (
     cd "${srcdir}"
     echo "m4_define(VERSION_NUMBER, [$(git describe --tags --abbrev=0)+git])" > version.m4
