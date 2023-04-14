@@ -7589,7 +7589,7 @@ msgstr "Warning 及更高级别"
 
 #: pkg/shell/topnav.jsx:123 pkg/shell/shell-modals.jsx:65
 msgid "Web Console"
-msgstr "ThingsWise iEOS Buddy"
+msgstr "iEOS Buddy"
 
 #: src/ws/cockpit.appdata.xml.in:8
 msgid "Web Console for Linux servers"
