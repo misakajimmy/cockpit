@@ -32,8 +32,7 @@ jobs:
              make
 
       - name: Build release
-        run: make dist -j$(nproc) VERSION='${{ github.ref_name }}' &&
-             ls
+        run: tools/make-debs --quick
 
       - name: Pack deb
         run: tools/make-debs --quick
