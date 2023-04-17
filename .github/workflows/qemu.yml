@@ -2,7 +2,7 @@ name: qemu
 on:
   push:
     branches:
-      - main
+      - iEOS
 
 jobs:
   my_job:
