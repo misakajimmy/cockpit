@@ -55,7 +55,7 @@ else
     source="$(realpath "$1")"
 fi
 
-echo source
+echo $source
 version=$(echo "$source" | sed -n 's|.*cockpit-\([^ /-]\+\)\.tar\..*|\1|p')
 if [ -z "$version" ]; then
     echo "make-debs: couldn't parse version from tarball: $source"
