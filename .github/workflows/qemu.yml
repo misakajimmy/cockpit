@@ -1,6 +1,8 @@
 name: auto-release
 on:
   push:
+    branches:
+      - iEOS
     tags:
       # this is a glob, not a regexp
       - '[0-9]*'
