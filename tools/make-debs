@@ -57,10 +57,10 @@ fi
 
 echo $source
 version=$(echo "$source" | sed -n 's|.*cockpit-\([^ /-]\+\)\.tar\..*|\1|p')
-if [ -z ${GITHUB_REF} ]; then 
+if [ -z "$REF_VERSION" ]; then 
 	echo "not github"
 else
-	version=${GITHUB_REF##*/}
+	version=${REF_VERSION}
 fi
 
 if [ -z "$version" ]; then
