@@ -28,12 +28,10 @@ jobs:
       - name: Run ARM64 container
         run: |
           REF_VERSION=${GITHUB_REF##*/}
-          echo $REF_VERSION
           docker run --rm --privileged multiarch/qemu-user-static:register --reset
           docker run --rm -v "${PWD}:/tmp/cockpit" -e REF_VERSION=$REF_VERSION misakajimmy/cockpit-arm64v8:0.1.1
           ls
-          chmod 777 ./*.deb
-          echo "Tag name is ${GITHUB_REF##*/}"
+          sudo chmod 777 ./*.deb
           for file in buddy*.deb; do
             echo $file
             name=$(echo $file | sed 's/^buddy-//; s/_.*\.deb$//')
@@ -42,25 +40,27 @@ jobs:
             # echo buddy-${name}_${version}_arm64.deb
             mv $file buddy-${name}_${version}_arm64.deb
           done
+          zip -r "cockpit-${REF_VERSION}.zip" ./*.deb
           ls
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ inputs.synapse_version }}
+          release_name: Release ${{ inputs.synapse_version }}
           body: |
             Changes in this release:
-            - Add new feature
-            - Fix bug
+            - XXXXXX
           draft: false
           prerelease: false
-      - name: Upload asset
-        uses: actions/upload-artifact@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
         with:
-          name: cockpit
-          path: ./*.deb     
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_name: "cockpit.zip"
+          asset_path: "cockpit.zip"
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
