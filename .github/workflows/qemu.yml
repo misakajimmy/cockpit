@@ -31,7 +31,7 @@ jobs:
         run: |
           echo $REF_VERSION
           docker run --rm --privileged multiarch/qemu-user-static:register --reset
-          docker run --rm -v "${PWD}:/tmp/cockpit" misakajimmy/cockpit-arm64v8:0.1.1
+          docker run --rm -v "${PWD}:/tmp/cockpit" misakajimmy/cockpit-arm64v8:0.1.2
           ls
           chmod 777 ./*.deb
           echo "Tag name is ${GITHUB_REF##*/}"
