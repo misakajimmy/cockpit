@@ -18,6 +18,8 @@
 
 set -euf
 
+echo $REF_VERSION
+
 mydir=$(dirname $(realpath "$0"))
 
 usage()
@@ -57,7 +59,7 @@ fi
 
 echo $source
 echo REF_VERSION
-echo $REF_VERSION
+
 version=$(echo "$source" | sed -n 's|.*cockpit-\([^ /-]\+\)\.tar\..*|\1|p')
 if [ -z "$REF_VERSION" ]; then 
 	echo "not github"
